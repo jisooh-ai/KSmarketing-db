@@ -557,8 +557,9 @@ async function loadDash(){
     const t0=Date.now();
     const args={p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:f.basis,p_brands:f.brands.length?f.brands:null};
     let D = await rpc('fn_dashboard',args);
-    if(D.status.inquiries>0 && !(D.status.agg_rows>0)){ loading(true,'집계 테이블이 비어 있어 갱신 중… (최초 1회, 10~60초)',50); await rpc('fn_refresh_agg',{}); loading(true,'다시 조회 중…',75); D = await rpc('fn_dashboard',args); }
+    if((D.status.inquiries>0 || D.status.car_unmapped>0) && (!(D.status.agg_rows>0) || !(D.status.agg_car_rows>0))){ loading(true,'집계 테이블이 비어 있어 갱신 중… (최초 1회, 10~60초)',50); await rpc('fn_refresh_agg',{}); loading(true,'다시 조회 중…',75); D = await rpc('fn_dashboard',args); }
     loading(true,'화면 그리는 중…',90);
+    if(D.status.ip_pending>0) ipMigrateLoop(D.status.ip_pending);
     const {status:st, P, M, S, C, L0, LM, LC, LB, LD, LMB, LPL, LT} = D;
     const took=((Date.now()-t0)/1000).toFixed(1);
     const inc = r => f.types.includes(r.media_type) && (!f.brands.length || f.brands.includes(brandOf(r)));
@@ -618,6 +619,15 @@ async function loadDash(){
     renderLead({L0, LM, LC, LB, LD, LMB, LPL, LT});
   }catch(e){ $('#status').innerHTML='<span class="pill bad">오류</span> '+esc(sqlErr(e)); }
   finally{ loading(false); btn.disabled=false; }
+}
+let _ipLoop=false;
+async function ipMigrateLoop(pending){
+  if(_ipLoop) return; _ipLoop=true; const tot=pending;
+  try{ while(pending>0){ $('#status').innerHTML += ` <span class="pill warn" id="ipPill">IP 중복 판정 준비 중… 남은 ${fmt(pending)}행 (자동 처리, 화면은 계속 사용 가능)</span>`;
+      const r=await rpc('fn_refresh_agg',{}); pending=r.ip_pending||0; const el=$('#ipPill'); if(el) el.remove(); }
+    toast('IP 중복 판정 완료 — 다시 조회하면 반영됩니다', 6000); loadDash();
+  }catch(e){ toast('IP 이관 중단: '+sqlErr(e)+' (다시 조회하면 이어서 진행)', 6000); }
+  finally{ _ipLoop=false; }
 }
 function leadSel(){ const sel=msSel('msLead'); const n=document.querySelectorAll('#msLead input').length; return (!sel.length||sel.length===n)? null : sel; }
 async function leadReload(){
@@ -1003,7 +1013,7 @@ async function addAdmin(){ const e=$('#adminEmail').value.trim().toLowerCase(); 
 async function delAdmin(e){ if(!confirm(e+' 의 관리자 권한을 제거할까요?')) return; const {error}=await sb.from('admin_users').delete().eq('email',e); if(error) return toast(sqlErr(error)); loadAdmins(); }
 
 /* ============================ 설정 ============================ */
-async function refreshAgg(){ loading(true,'집계·IP 중복 갱신 중… (10~60초)',50); try{ const r=await rpc('fn_refresh_agg',{}); toast(`집계 갱신 완료 (${fmt(r.media_rows)}행)`); showStatus(); }catch(e){ toast('실패: '+sqlErr(e),6000); } finally{ loading(false); } }
+async function refreshAgg(){ loading(true,'집계·IP 중복 갱신 중…',30); try{ let r=await rpc('fn_refresh_agg',{}); let n=1; while((r.ip_pending||0)>0){ loading(true,`IP 이관 남은 ${fmt(r.ip_pending)}행 … (${n++}회차)`,60); r=await rpc('fn_refresh_agg',{}); } toast(`집계 갱신 완료 (${fmt(r.media_rows)}행)`); showStatus(); }catch(e){ toast('실패: '+sqlErr(e),6000); } finally{ loading(false); } }
 async function showStatus(){ try{ const st=await rpc('fn_data_status',{}); $('#setStatus').textContent=JSON.stringify(st,null,2); }catch(e){ $('#setStatus').textContent=sqlErr(e); } }
 
 init();
