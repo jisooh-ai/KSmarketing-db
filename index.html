@@ -502,10 +502,10 @@ function sumRows(rows, f, spend){
 }
 // 광고비 없는 표용 (매체·플랫폼)
 function metricColsNoCost(s){ return [fmt(s.db), fmt(s.dbSel), fmt(s.contracts), won(s.revenue), won(s.carprice), pct(s.contracts,s.dbSel)]; }
-const METRIC_H_NOCOST = ['DB(전체)','DB(제외후)','계약수','계약 매출','차량가 합계','전환율'];
+const METRIC_H_NOCOST = ['DB(전체)','DB(제외후)','계약수','실행매출','차량가 합계','전환율'];
 // 열: DB(전체) | DB(제외후) | 계약 | 매출 | 마진 | 광고비 | ROAS | CPA(DB) | CPA(계약) | 전환율   ※ CPA·전환율은 제외후 DB 기준
 function metricCols(s){ return [fmt(s.db), fmt(s.dbSel), fmt(s.contracts), won(s.revenue), won(s.carprice), won(s.cost), s.cost?fmt(100*s.revenue/s.cost,1)+'%':'-', s.cost?won(s.cost/(s.contracts||NaN)):'-', s.cost?won(s.cost/(s.dbSel||NaN)):'-', pct(s.contracts,s.dbSel)]; }
-const METRIC_H = ['DB(전체)','DB(제외후)','계약수','계약 매출','차량가 합계','광고비','ROAS','CPA(계약당)','CPL(DB당)','전환율'];
+const METRIC_H = ['DB(전체)','DB(제외후)','계약수','실행매출','차량가 합계','광고비','ROAS','CPA(계약당)','CPL(DB당)','전환율'];
 function groupBy(rows, keyFn){ const m=new Map(); rows.forEach(r=>{ const k=keyFn(r)??'(없음)'; if(!m.has(k)) m.set(k,[]); m.get(k).push(r); }); return m; }
 function renderTable(id, headers, rows, opts={}){
   const t=$('#'+id); const leftCols=opts.left||[0];
@@ -537,7 +537,7 @@ function renderTrend(Pf, f, s){
     {type:'bar',label:'DB('+f.dbLabel+')',data:tr.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.55)',yAxisID:'y'},
     {type:'bar',label:'계약수',data:tr.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.6)',yAxisID:'y'},
     {type:'line',label:'광고비',data:tr.map(x=>x.cost),borderColor:'#f59e0b',backgroundColor:'#f59e0b',yAxisID:'y2',tension:.2},
-    {type:'line',label:'계약 매출',data:tr.map(x=>x.revenue),borderColor:'#8b5cf6',backgroundColor:'#8b5cf6',yAxisID:'y2',tension:.2}]},
+    {type:'line',label:'실행매출',data:tr.map(x=>x.revenue),borderColor:'#8b5cf6',backgroundColor:'#8b5cf6',yAxisID:'y2',tension:.2}]},
     options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{callback:v=>won(v)}}}}});
 
 }
@@ -577,7 +577,7 @@ async function loadDash(){
     const s=sumRows(Mf,f,Sf); const lt=L0[0]||{};
     $('#kpis').innerHTML=[
       ['광고비', won(s.cost), s.cost?'':'광고비 미입력 (광고비 탭)'],
-      ['계약 매출', won(s.revenue), `계약마진 합계 · 건당 ${won(s.contracts? s.revenue/s.contracts:null)}`],
+      ['실행매출', won(s.revenue), `계약마진 합계 · 건당 ${won(s.contracts? s.revenue/s.contracts:null)}`],
       ['ROAS', s.cost? fmt(100*s.revenue/s.cost,1)+'%' : '-', ''],
       ['계약 수', fmt(s.contracts), ''],
       ['계약당 비용 (CPA)', s.cost&&s.contracts? fmt(s.cost/s.contracts)+'원':'-', ''],
