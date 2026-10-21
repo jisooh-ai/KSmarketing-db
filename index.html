@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>마케팅 퍼포먼스 DB</title>
+<!-- ===================== 설정 =====================
+     Supabase 프로젝트 > Settings > API 의 값을 아래 두 줄에 넣으세요.
+     (비워두면 앱의 [설정] 탭에서 입력해 브라우저에 저장할 수 있습니다) -->
+<script>
+  const SUPABASE_URL      = "";
+  const SUPABASE_ANON_KEY = "";
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#f5f6f8;--card:#fff;--line:#e3e6ea;--text:#1f2328;--muted:#6b7280;--accent:#2563eb;--accent2:#0ea5e9;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;
+        --c1:#2563eb;--c2:#f59e0b;--c3:#10b981;--c4:#8b5cf6;--c5:#ef4444;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif}
+  header{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  .bar{max-width:1400px;margin:0 auto;padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .bar h1{font-size:16px;margin:0 12px 0 0}
+  nav button{background:none;border:0;padding:8px 12px;border-radius:6px;cursor:pointer;color:var(--muted);font-weight:600}
+  nav button.on{background:#eaf0ff;color:var(--accent)}
+  .spacer{flex:1}
+  main{max-width:1400px;margin:0 auto;padding:16px}
+  section.page{display:none}
+  section.page.on{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+  .card h2{font-size:15px;margin:0 0 10px}
+  .card h3{font-size:13px;margin:14px 0 6px;color:var(--muted)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .row>div{display:flex;flex-direction:column;gap:3px}
+  label{font-size:12px;color:var(--muted)}
+  input,select,textarea{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;background:#fff;min-width:0}
+  input[type=number]{width:120px}
+  button.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:7px 14px;font:inherit;font-weight:600;cursor:pointer}
+  button.btn.sec{background:#fff;color:var(--text);border:1px solid var(--line)}
+  button.btn.sm{padding:4px 9px;font-size:12px}
+  button.btn:disabled{opacity:.5;cursor:default}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .kpi .l{font-size:12px;color:var(--muted)}
+  .kpi .v{font-size:20px;font-weight:700;margin-top:2px}
+  .kpi .s{font-size:11px;color:var(--muted)}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:right;white-space:nowrap}
+  th{background:#fafbfc;position:sticky;top:0;cursor:pointer;user-select:none}
+  th:first-child,td:first-child{text-align:left}
+  td.l,th.l{text-align:left}
+  .tw{overflow:auto;max-height:480px;border:1px solid var(--line);border-radius:8px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+  .muted{color:var(--muted);font-size:12px}
+  .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;background:#eef2f7}
+  .pill.warn{background:#fff4e5;color:var(--warn)} .pill.bad{background:#fde8e8;color:var(--bad)} .pill.ok{background:#e7f7ec;color:var(--ok)}
+  .prog{height:8px;background:#eef2f7;border-radius:4px;overflow:hidden;margin-top:6px}
+  .prog>div{height:100%;background:var(--accent);width:0%}
+  #login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+  #login .card{width:340px}
+  .chk{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .chk label{display:flex;gap:4px;align-items:center;color:var(--text);font-size:13px}
+  canvas{max-height:300px}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1f2328;color:#fff;padding:10px 16px;border-radius:8px;opacity:0;transition:.2s;z-index:200;max-width:90vw}
+  .toast.on{opacity:1}
+  td input,td select{padding:3px 6px;font-size:12px}
+  .pre{font-family:ui-monospace,monospace;font-size:12px;background:#f8fafc;padding:8px;border-radius:6px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="card">
+    <h2>마케팅 퍼포먼스 DB</h2>
+    <div id="cfgBox" style="display:none">
+      <div class="muted">Supabase 접속 정보가 없습니다. 입력 후 저장하세요 (이 브라우저에만 저장).</div>
+      <div class="row" style="margin:8px 0"><div style="flex:1"><label>Project URL</label><input id="cfgUrl" placeholder="https://xxxx.supabase.co"></div></div>
+      <div class="row" style="margin:8px 0"><div style="flex:1"><label>anon public key</label><input id="cfgKey" placeholder="eyJ..."></div></div>
+      <button class="btn" onclick="saveCfg()">저장 후 계속</button>
+    </div>
+    <div id="loginBox">
+      <div class="row" style="margin:8px 0"><div style="flex:1"><label>이메일</label><input id="email" type="email" autocomplete="username"></div></div>
+      <div class="row" style="margin:8px 0"><div style="flex:1"><label>비밀번호</label><input id="pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()"></div></div>
+      <button class="btn" onclick="login()">로그인</button>
+      <div id="loginMsg" class="muted" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+
+<header><div class="bar">
+  <h1>마케팅 퍼포먼스 DB</h1>
+  <nav>
+    <button data-p="dash" class="on">대시보드</button>
+    <button data-p="upload">업로드</button>
+    <button data-p="spend">광고비</button>
+    <button data-p="map">매핑</button>
+    <button data-p="down">다운로드</button>
+    <button data-p="set">설정</button>
+  </nav>
+  <div class="spacer"></div>
+  <span id="who" class="muted"></span>
+  <button class="btn sec sm" onclick="logout()">로그아웃</button>
+</div></header>
+
+<main>
+<!-- ================= 대시보드 ================= -->
+<section class="page on" id="p-dash">
+  <div class="card">
+    <div class="row">
+      <div><label>시작일</label><input type="date" id="fFrom"></div>
+      <div><label>종료일</label><input type="date" id="fTo"></div>
+      <div><label>매출 기준일</label><select id="fBasis"><option value="contract">계약일자</option><option value="inquiry">문의일자</option></select></div>
+      <div><label>추이 단위</label><select id="fGrain"><option value="day">일</option><option value="week" selected>주</option><option value="month">월</option><option value="year">연</option></select></div>
+      <div><label>DB 기준</label><select id="fDb"><option value="net">순DB (중복여부=N)</option><option value="all">전체 DB</option></select></div>
+      <div><label>매체유형 포함</label><div class="chk" id="fTypes">
+        <label><input type="checkbox" value="유료광고" checked>유료광고</label>
+        <label><input type="checkbox" value="오가닉" checked>오가닉</label>
+        <label><input type="checkbox" value="미분류" checked>미분류</label>
+        <label><input type="checkbox" value="내부">내부</label>
+        <label><input type="checkbox" value="경비">경비</label></div></div>
+      <div><button class="btn" onclick="loadDash()">조회</button></div>
+    </div>
+    <div id="status" class="muted" style="margin-top:8px"></div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>기간별 추이</h2>
+    <canvas id="chTrend"></canvas>
+    <div class="tw" style="margin-top:10px"><table id="tTrend"></table></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h2>매체별 성과 <span class="muted">(선택 기간 합계)</span></h2><canvas id="chMedia"></canvas><div class="tw" style="margin-top:10px"><table id="tMedia"></table></div></div>
+    <div class="card"><h2>브랜드별 요약 <span class="muted">(매체 마스터의 브랜드 기준)</span></h2><div class="tw"><table id="tBrand"></table></div>
+      <h3>플랫폼별</h3><div class="tw"><table id="tPlatform"></table></div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h2>문의 많은 차량 TOP 15</h2><div class="tw"><table id="tCarInq"></table></div></div>
+    <div class="card"><h2>계약 많은 차량 TOP 15</h2><div class="tw"><table id="tCarSale"></table></div></div>
+  </div>
+  <div class="card"><h2>차량 문의 vs 계약</h2><canvas id="chCar"></canvas></div>
+
+  <div class="card">
+    <h2>리드타임 <span class="muted">(계약일자 − 문의일자, 음수·1년 초과·경비 제외)</span></h2>
+    <div class="kpis" id="ltKpis"></div>
+    <div class="grid2" style="margin-top:12px">
+      <div><h3>분포</h3><canvas id="chLead"></canvas></div>
+      <div><h3>차량 브랜드별</h3><div class="tw"><table id="tLeadBrand"></table></div></div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div><h3>매체별 (계약 5건 이상)</h3><div class="tw"><table id="tLeadMedia"></table></div></div>
+      <div><h3>차량별 (계약 5건 이상)</h3><div class="tw"><table id="tLeadCar"></table></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 업로드 ================= -->
+<section class="page" id="p-upload">
+  <div class="card">
+    <h2>raw 데이터 업로드</h2>
+    <div class="row">
+      <div><label>데이터 종류</label><select id="upKind"><option value="inquiry">유입 문의 DB (광고매체)</option><option value="sales">매출 raw (유입매체)</option></select></div>
+      <div><label>파일 (.xlsx / .csv)</label><input type="file" id="upFile" accept=".xlsx,.xls,.csv"></div>
+      <div><label>메모 (예: 2026-09 월간 추출)</label><input id="upNote" style="width:240px"></div>
+      <div id="piiBox"><label>&nbsp;</label><label style="color:var(--text)"><input type="checkbox" id="upPii" checked> 고객명·고객IP 제외(권장)</label></div>
+      <div><button class="btn sec" onclick="parseUpload()">검증</button></div>
+      <div><button class="btn" id="upGo" onclick="doUpload()" disabled>업로드</button></div>
+    </div>
+    <div id="upMsg" class="muted" style="margin-top:8px"></div>
+    <div class="prog"><div id="upBar"></div></div>
+    <div id="upPreview" style="margin-top:10px"></div>
+  </div>
+  <div class="card">
+    <h2>업로드 이력 <span class="muted">· 매출은 "활성" 배치만 집계에 포함됩니다. 같은 기간을 다시 올렸으면 이전 배치를 비활성화하세요.</span></h2>
+    <div class="tw"><table id="tBatches"></table></div>
+  </div>
+  <div class="card">
+    <h2>규칙</h2>
+    <ul class="muted" style="margin:0;padding-left:18px">
+      <li>원본 값은 수정·삭제하지 않고 그대로 저장합니다. 알 수 없는 컬럼은 <code>raw</code>(JSON)에 보존됩니다.</li>
+      <li>유입 DB는 <b>문의번호</b>가 고유키입니다. 같은 문의번호를 다시 올리면 최신 값으로 갱신(상태 변경 반영)됩니다.</li>
+      <li>매출 raw는 고유키가 없어 배치 단위로 보존합니다. 중복 행도 삭제하지 않으며, 집계에서 빼려면 배치를 비활성화합니다.</li>
+      <li>업로드되는 광고매체(유입)는 자동으로 매체 마스터에 등록됩니다. 매출의 유입매체는 등록하지 않으며, 마스터에 없는 매체는 "미매칭 매출"로 분리됩니다.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= 광고비 ================= -->
+<section class="page" id="p-spend">
+  <div class="card">
+    <h2>광고비 입력 (일 단위)</h2>
+    <div class="row">
+      <div><label>일자</label><input type="date" id="spDate"></div>
+      <div><label>표준매체명</label><input id="spMedia" list="mediaStdList" style="width:260px" placeholder="매체 마스터의 표준매체명"><datalist id="mediaStdList"></datalist></div>
+      <div><label>광고비(원)</label><input type="number" id="spCost" min="0"></div>
+      <div><label>노출</label><input type="number" id="spImp" min="0"></div>
+      <div><label>클릭</label><input type="number" id="spClk" min="0"></div>
+      <div><label>메모</label><input id="spMemo"></div>
+      <div><button class="btn" onclick="saveSpend()">저장</button></div>
+    </div>
+    <div class="muted" style="margin-top:6px">같은 일자+매체를 다시 저장하면 덮어씁니다.</div>
+  </div>
+  <div class="card">
+    <h2>광고비 일괄 업로드</h2>
+    <div class="row">
+      <div><label>파일 (.xlsx/.csv) — 헤더: 일자, 매체, 광고비, 노출, 클릭</label><input type="file" id="spFile" accept=".xlsx,.xls,.csv"></div>
+      <div><button class="btn sec" onclick="downloadSpendTemplate()">양식 다운로드</button></div>
+      <div><button class="btn" onclick="uploadSpend()">업로드</button></div>
+    </div>
+    <div id="spMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+  <div class="card">
+    <h2>월별 광고비 내역</h2>
+    <div class="row"><div><label>월</label><input type="month" id="spMonth"></div><div><button class="btn sec" onclick="loadSpend()">조회</button></div></div>
+    <div class="tw" style="margin-top:10px"><table id="tSpend"></table></div>
+  </div>
+</section>
+
+<!-- ================= 매핑 ================= -->
+<section class="page" id="p-map">
+  <div class="card">
+    <h2>매체 마스터 <span class="muted">(유입 광고매체 기준 · 표준매체명/유형/플랫폼/브랜드를 채우세요)</span></h2>
+    <div class="row">
+      <div><label>필터</label><select id="mmFilter"><option value="all">전체</option><option value="unc" selected>미분류만</option></select></div>
+      <div><label>검색</label><input id="mmSearch" placeholder="매체명"></div>
+      <div><button class="btn sec" onclick="loadMediaMap()">조회</button></div>
+      <div><button class="btn" onclick="saveMediaMap()">변경사항 저장</button></div>
+      <div class="muted" id="mmMsg"></div>
+    </div>
+    <div class="tw" style="margin-top:10px;max-height:560px"><table id="tMediaMap"></table></div>
+  </div>
+  <div class="card">
+    <h2>차량 마스터 <span class="muted">(브랜드/표준모델명 · 건수 많은 순)</span></h2>
+    <div class="row">
+      <div><label>필터</label><select id="cmFilter"><option value="unmapped" selected>브랜드 미지정만</option><option value="auto">자동 매핑(검토 필요)</option><option value="all">전체</option></select></div>
+      <div><label>검색</label><input id="cmSearch" placeholder="차량명"></div>
+      <div><label>표시 건수</label><select id="cmLimit"><option>100</option><option selected>300</option><option>1000</option></select></div>
+      <div><button class="btn sec" onclick="loadCarMap()">조회</button></div>
+      <div><button class="btn" onclick="saveCarMap()">변경사항 저장</button></div>
+      <div class="muted" id="cmMsg"></div>
+    </div>
+    <datalist id="brandList"></datalist>
+    <div class="tw" style="margin-top:10px;max-height:560px"><table id="tCarMap"></table></div>
+  </div>
+</section>
+
+<!-- ================= 다운로드 ================= -->
+<section class="page" id="p-down">
+  <div class="card">
+    <h2>집계 결과 다운로드 (CSV, 엑셀에서 바로 열림)</h2>
+    <div class="muted">대시보드의 현재 필터(기간·기준·매체유형)가 적용됩니다.</div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn sec" onclick="dl('media_period')">매체 × 기간 집계</button>
+      <button class="btn sec" onclick="dl('media_total')">매체별 합계</button>
+      <button class="btn sec" onclick="dl('car')">차량별 집계</button>
+      <button class="btn sec" onclick="dl('lead_media')">리드타임 매체별</button>
+      <button class="btn sec" onclick="dl('lead_car')">리드타임 차량별</button>
+    </div>
+    <h3>원본·마스터</h3>
+    <div class="row">
+      <button class="btn sec" onclick="dl('unmatched')">미매칭 매출 (유입 매체에 없는 행)</button>
+      <button class="btn sec" onclick="dl('media_map')">매체 마스터</button>
+      <button class="btn sec" onclick="dl('car_map')">차량 마스터</button>
+      <button class="btn sec" onclick="dl('ad_spend')">광고비 전체</button>
+    </div>
+    <div id="dlMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+</section>
+
+<!-- ================= 설정 ================= -->
+<section class="page" id="p-set">
+  <div class="card">
+    <h2>접속 설정</h2>
+    <div class="row"><div style="flex:1"><label>Project URL</label><input id="setUrl"></div></div>
+    <div class="row" style="margin-top:8px"><div style="flex:1"><label>anon public key</label><input id="setKey"></div></div>
+    <div class="row" style="margin-top:8px"><button class="btn" onclick="saveCfg(true)">저장 후 새로고침</button><button class="btn sec" onclick="localStorage.removeItem('sb_cfg');location.reload()">저장된 설정 삭제</button></div>
+    <div class="muted" style="margin-top:8px">anon key는 공개 키입니다. 데이터 보호는 Supabase의 RLS(로그인 사용자만 허용)로 이루어지므로 로그인 계정을 외부에 공유하지 마세요.</div>
+  </div>
+  <div class="card">
+    <h2>데이터 현황</h2>
+    <div id="setStatus" class="pre">-</div>
+  </div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================ 공통 ============================ */
+let sb, user, DASH = {};  // DASH: 대시보드 마지막 조회 결과(다운로드용)
+const $ = s => document.querySelector(s);
+const fmt = (n, d=0) => (n==null||isNaN(n)) ? '-' : Number(n).toLocaleString('ko-KR',{maximumFractionDigits:d, minimumFractionDigits:d});
+const won = n => (n==null||isNaN(n)) ? '-' : (Math.abs(n)>=1e8 ? fmt(n/1e8,1)+'억' : Math.abs(n)>=1e4 ? fmt(n/1e4,0)+'만' : fmt(n));
+const pct = (a,b) => b ? fmt(100*a/b,1)+'%' : '-';
+const div = (a,b,d=1) => b ? fmt(a/b,d) : '-';
+const esc = s => String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(m, ms=2500){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'), ms); }
+function getCfg(){ try{ const c=JSON.parse(localStorage.getItem('sb_cfg')||'null'); if(c&&c.url&&c.key) return c; }catch(e){} return (SUPABASE_URL&&SUPABASE_ANON_KEY)?{url:SUPABASE_URL,key:SUPABASE_ANON_KEY}:null; }
+function saveCfg(fromSet){ const url=(fromSet?$('#setUrl'):$('#cfgUrl')).value.trim(), key=(fromSet?$('#setKey'):$('#cfgKey')).value.trim(); if(!url||!key) return toast('URL과 key를 모두 입력하세요'); try{ localStorage.setItem('sb_cfg', JSON.stringify({url,key})); }catch(e){} location.reload(); }
+function sqlErr(e){ console.error(e); return (e&&(e.message||e.error_description||e.hint))||String(e); }
+async function rpc(fn, args){ const {data,error}=await sb.rpc(fn,args); if(error) throw error; return data; }
+async function selectAll(table, build){ // 1000행 제한 우회 페이지네이션
+  let out=[], from=0; const step=1000;
+  for(;;){ let q=sb.from(table).select('*'); if(build) q=build(q); const {data,error}=await q.range(from, from+step-1); if(error) throw error; out=out.concat(data||[]); if(!data||data.length<step) break; from+=step; }
+  return out;
+}
+
+/* ============================ 인증 ============================ */
+async function init(){
+  const cfg=getCfg();
+  if(!cfg){ $('#cfgBox').style.display='block'; $('#loginBox').style.display='none'; return; }
+  sb = supabase.createClient(cfg.url, cfg.key);
+  $('#setUrl').value=cfg.url; $('#setKey').value=cfg.key;
+  const {data:{session}} = await sb.auth.getSession();
+  if(session) afterLogin(session.user);
+  sb.auth.onAuthStateChange((ev, s)=>{ if(ev==='SIGNED_OUT'){ location.reload(); } });
+}
+async function login(){
+  $('#loginMsg').textContent='로그인 중…';
+  const {data,error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(), password:$('#pw').value});
+  if(error){ $('#loginMsg').textContent='로그인 실패: '+sqlErr(error); return; }
+  afterLogin(data.user);
+}
+async function logout(){ await sb.auth.signOut(); }
+function afterLogin(u){
+  user=u; $('#who').textContent=u.email; $('#login').style.display='none';
+  const today=new Date(); const y=today.getFullYear();
+  $('#fFrom').value=`${y}-01-01`; $('#fTo').value=today.toISOString().slice(0,10);
+  $('#spDate').value=today.toISOString().slice(0,10); $('#spMonth').value=today.toISOString().slice(0,7);
+  loadDash(); loadBatches(); loadMediaStdList();
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('section.page').forEach(s=>s.classList.toggle('on', s.id==='p-'+b.dataset.p));
+  if(b.dataset.p==='map'){ loadMediaMap(); loadCarMap(); }
+  if(b.dataset.p==='spend'){ loadSpend(); loadMediaStdList(); }
+  if(b.dataset.p==='set'){ showStatus(); }
+  if(b.dataset.p==='upload'){ loadBatches(); }
+});
+$('#upKind').onchange=()=>{ $('#piiBox').style.display = $('#upKind').value==='inquiry'?'':'none'; $('#upGo').disabled=true; $('#upPreview').innerHTML=''; };
+
+/* ============================ 대시보드 ============================ */
+function filters(){
+  const types=[...document.querySelectorAll('#fTypes input:checked')].map(i=>i.value);
+  return { from:$('#fFrom').value, to:$('#fTo').value, basis:$('#fBasis').value, grain:$('#fGrain').value, db:$('#fDb').value, types };
+}
+const charts={};
+function chart(id, cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart($('#'+id), cfg); }
+function dbOf(r,f){ return f.db==='net'? r.net_db : r.db_count; }
+function sumRows(rows, f){
+  const s={db:0,net:0,contracts:0,revenue:0,margin:0,cost:0,impressions:0,clicks:0};
+  rows.forEach(r=>{ s.db+=r.db_count; s.net+=r.net_db; s.contracts+=r.contracts; s.revenue+=+r.revenue; s.margin+=+r.margin; s.cost+=+r.cost; s.impressions+=+r.impressions; s.clicks+=+r.clicks; });
+  s.dbSel = f.db==='net'? s.net : s.db; return s;
+}
+function metricCols(s){ return [fmt(s.dbSel), fmt(s.contracts), won(s.revenue), won(s.margin), won(s.cost), div(s.revenue,s.cost,1), s.cost?won(s.cost/(s.dbSel||NaN)):'-', s.cost?won(s.cost/(s.contracts||NaN)):'-', pct(s.contracts,s.dbSel)]; }
+const METRIC_H = ['DB수','계약수','매출','마진','광고비','ROAS','CPA(DB)','CPA(계약)','전환율'];
+function groupBy(rows, keyFn){ const m=new Map(); rows.forEach(r=>{ const k=keyFn(r)??'(없음)'; if(!m.has(k)) m.set(k,[]); m.get(k).push(r); }); return m; }
+function renderTable(id, headers, rows, opts={}){
+  const t=$('#'+id); const leftCols=opts.left||[0];
+  let h='<thead><tr>'+headers.map((x,i)=>`<th class="${leftCols.includes(i)?'l':''}" data-i="${i}">${esc(x)}</th>`).join('')+'</tr></thead>';
+  h+='<tbody>'+rows.map(r=>'<tr>'+r.map((c,i)=>`<td class="${leftCols.includes(i)?'l':''}">${c}</td>`).join('')+'</tr>').join('')+'</tbody>';
+  if(opts.foot) h+='<tfoot><tr style="font-weight:700;background:#fafbfc">'+opts.foot.map((c,i)=>`<td class="${leftCols.includes(i)?'l':''}">${c}</td>`).join('')+'</tr></tfoot>';
+  t.innerHTML=h;
+  // 정렬
+  t.querySelectorAll('th').forEach(th=>th.onclick=()=>{
+    const i=+th.dataset.i, tb=t.tBodies[0], trs=[...tb.rows]; const asc = t._si===i ? !t._asc : false; t._si=i; t._asc=asc;
+    const num = s=>{ const x=parseFloat(String(s).replace(/[^\d.\-]/g,'')); return isNaN(x)? -Infinity : (/억/.test(s)? x*1e8 : /만/.test(s)? x*1e4 : x); };
+    trs.sort((a,b)=>{ const A=a.cells[i].textContent, B=b.cells[i].textContent; const na=num(A), nb=num(B); const r = (leftCols.includes(i)) ? A.localeCompare(B,'ko') : (na-nb); return asc? r : -r; });
+    trs.forEach(tr=>tb.appendChild(tr));
+  });
+}
+async function loadDash(){
+  const f=filters(); if(!f.from||!f.to) return toast('기간을 선택하세요');
+  $('#status').textContent='조회 중…';
+  try{
+    const [st, P, M, C, L0, LM, LC, LB, LD] = await Promise.all([
+      rpc('fn_data_status',{}),
+      rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:f.basis}),
+      rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:'all',p_basis:f.basis}),
+      rpc('fn_car_summary',{p_from:f.from,p_to:f.to,p_basis:f.basis}),
+      rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'all'}),
+      rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'media'}),
+      rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'car'}),
+      rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'car_brand'}),
+      rpc('fn_leadtime_dist',{p_from:f.from,p_to:f.to,p_basis:f.basis}),
+    ]);
+    const inc = r => f.types.includes(r.media_type);
+    const Pf=P.filter(inc), Mf=M.filter(inc);
+    DASH={f, P:Pf, M:Mf, C, L0, LM, LC, LB, LD};
+    const unc = M.filter(r=>r.media_type==='미분류').length;
+    $('#status').innerHTML = `유입 ${fmt(st.inquiries)}건 (${(st.inquiry_min||'').slice(0,10)} ~ ${(st.inquiry_max||'').slice(0,10)}) · 활성 매출 ${fmt(st.sales_active)}건 (계약일 ${st.contract_min||'-'} ~ ${st.contract_max||'-'}) · 광고비 입력 ${fmt(st.ad_spend_days)}일 (최근 ${st.ad_spend_max||'-'})`
+      + (st.sales_unmatched? ` · <span class="pill warn">미매칭 매출 ${fmt(st.sales_unmatched)}건 (유입 매체에 없음, 집계 제외)</span>`:'')
+      + (st.media_unclassified? ` · <span class="pill warn">미분류 매체 ${fmt(st.media_unclassified)}종</span>`:'')
+      + (st.car_unmapped? ` · <span class="pill">브랜드 미지정 차량명 ${fmt(st.car_unmapped)}종</span>`:'');
+
+    // KPI
+    const s=sumRows(Mf,f); const lt=L0[0]||{};
+    $('#kpis').innerHTML=[
+      ['DB수 ('+(f.db==='net'?'순DB':'전체')+')', fmt(s.dbSel), f.db==='net'?`전체 ${fmt(s.db)}`:`순DB ${fmt(s.net)}`],
+      ['계약수', fmt(s.contracts), `전환율 ${pct(s.contracts,s.dbSel)}`],
+      ['매출(차량가격)', won(s.revenue), `건당 ${won(s.contracts? s.revenue/s.contracts:null)}`],
+      ['계약마진', won(s.margin), `마진율 ${pct(s.margin,s.revenue)}`],
+      ['광고비', won(s.cost), s.cost?`노출 ${fmt(s.impressions)} · 클릭 ${fmt(s.clicks)}`:'광고비 미입력'],
+      ['ROAS', s.cost? fmt(s.revenue/s.cost,1)+'x' : '-', s.cost? `마진 ROAS ${fmt(s.margin/s.cost,2)}x`:'광고비 입력 필요'],
+      ['CPA (DB당)', s.cost&&s.dbSel? fmt(s.cost/s.dbSel)+'원':'-', ''],
+      ['CPA (계약당)', s.cost&&s.contracts? fmt(s.cost/s.contracts)+'원':'-', ''],
+      ['리드타임 중앙값', lt.median_days!=null? fmt(lt.median_days,1)+'일':'-', lt.n? `평균 ${fmt(lt.avg_days,1)}일 · n=${fmt(lt.n)}`:''],
+    ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
+
+    // 추이
+    const byP=groupBy(Pf, r=>r.period); const periods=[...byP.keys()].sort();
+    const tr = periods.map(p=>{ const x=sumRows(byP.get(p),f); return {p, ...x}; });
+    renderTable('tTrend', ['기간',...METRIC_H], tr.map(x=>[x.p, ...metricCols(x)]), {foot:['합계',...metricCols(s)]});
+    chart('chTrend',{data:{labels:periods, datasets:[
+      {type:'bar',label:'DB수',data:tr.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.35)',yAxisID:'y'},
+      {type:'bar',label:'계약수',data:tr.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.6)',yAxisID:'y'},
+      {type:'line',label:'광고비',data:tr.map(x=>x.cost),borderColor:'#f59e0b',backgroundColor:'#f59e0b',yAxisID:'y2',tension:.2},
+      {type:'line',label:'매출',data:tr.map(x=>x.revenue),borderColor:'#8b5cf6',backgroundColor:'#8b5cf6',yAxisID:'y2',tension:.2}]},
+      options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{callback:v=>won(v)}}}}});
+
+    // 매체별
+    const byM=groupBy(Mf, r=>r.media_std); const mr=[...byM.entries()].map(([k,rows])=>({k, type:rows[0].media_type, brand:rows[0].brand, ...sumRows(rows,f)})).sort((a,b)=>b.dbSel-a.dbSel);
+    renderTable('tMedia', ['매체','유형','브랜드',...METRIC_H], mr.map(x=>[esc(x.k), esc(x.type), esc(x.brand??''), ...metricCols(x)]), {left:[0,1,2], foot:['합계','','',...metricCols(s)]});
+    const top=mr.slice(0,15);
+    chart('chMedia',{type:'bar',data:{labels:top.map(x=>x.k),datasets:[{label:'DB수',data:top.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.6)'},{label:'계약수',data:top.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.8)'}]},options:{indexAxis:'y',scales:{x:{beginAtZero:true}}}});
+
+    // 브랜드/플랫폼
+    const byB=groupBy(Mf, r=>r.brand||'(브랜드 미지정)'); const br=[...byB.entries()].map(([k,rows])=>({k,...sumRows(rows,f)})).sort((a,b)=>b.dbSel-a.dbSel);
+    renderTable('tBrand', ['브랜드',...METRIC_H], br.map(x=>[esc(x.k),...metricCols(x)]), {foot:['합계',...metricCols(s)]});
+    const byPl=groupBy(Mf, r=>r.platform||'(플랫폼 미지정)'); const pl=[...byPl.entries()].map(([k,rows])=>({k,...sumRows(rows,f)})).sort((a,b)=>b.dbSel-a.dbSel);
+    renderTable('tPlatform', ['플랫폼',...METRIC_H], pl.map(x=>[esc(x.k),...metricCols(x)]));
+
+    // 차량
+    const cars=C.map(r=>({...r, dbSel: f.db==='net'? r.net_db : r.db_count}));
+    const ci=[...cars].sort((a,b)=>b.dbSel-a.dbSel).slice(0,15), cs=[...cars].sort((a,b)=>b.contracts-a.contracts).slice(0,15);
+    const carRow = x => [esc(x.model_std||'(없음)'), esc(x.car_brand??''), fmt(x.dbSel), fmt(x.contracts), pct(x.contracts,x.dbSel), won(x.revenue)];
+    renderTable('tCarInq', ['차량','브랜드','문의(DB)','계약','전환율','매출'], ci.map(carRow), {left:[0,1]});
+    renderTable('tCarSale', ['차량','브랜드','문의(DB)','계약','전환율','매출'], cs.map(carRow), {left:[0,1]});
+    const cc=[...cars].filter(x=>x.model_std&&x.model_std!=='-').sort((a,b)=>b.contracts-a.contracts).slice(0,12);
+    chart('chCar',{type:'bar',data:{labels:cc.map(x=>x.model_std),datasets:[{label:'문의(DB)',data:cc.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.5)',yAxisID:'y'},{label:'계약',data:cc.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.9)',yAxisID:'y2'}]},options:{scales:{y:{beginAtZero:true,position:'left'},y2:{beginAtZero:true,position:'right',grid:{drawOnChartArea:false}}}}});
+
+    // 리드타임
+    $('#ltKpis').innerHTML=[['계약 건수(정상)',fmt(lt.n)],['평균',fmt(lt.avg_days,1)+'일'],['중앙값',fmt(lt.median_days,1)+'일'],['25% / 75%',fmt(lt.p25,0)+' / '+fmt(lt.p75,0)+'일'],['7일 이내 비율',fmt(lt.within7_pct,1)+'%']]
+      .map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${lt.n?k[1]:'-'}</div></div>`).join('');
+    chart('chLead',{type:'bar',data:{labels:LD.map(x=>x.bucket),datasets:[{label:'계약 건수',data:LD.map(x=>x.n),backgroundColor:LD.map(x=>x.bucket.startsWith('제외')?'rgba(220,38,38,.5)':'rgba(37,99,235,.6)')}]},options:{scales:{y:{beginAtZero:true}}}});
+    const ltRow = x => [esc(x.dim_value??'(없음)'), fmt(x.n), fmt(x.avg_days,1), fmt(x.median_days,1), fmt(x.p25,0)+' / '+fmt(x.p75,0), fmt(x.within7_pct,1)+'%'];
+    const LTH=['구분','건수','평균(일)','중앙값(일)','25%/75%','7일내'];
+    renderTable('tLeadBrand', LTH, LB.map(ltRow));
+    renderTable('tLeadMedia', LTH, LM.filter(x=>x.n>=5).map(ltRow));
+    renderTable('tLeadCar', LTH, LC.filter(x=>x.n>=5).map(ltRow));
+  }catch(e){ $('#status').innerHTML='<span class="pill bad">오류</span> '+esc(sqlErr(e)); }
+}
+
+/* ============================ 업로드 ============================ */
+const INQ_MAP = {'No.':'src_no','문의번호':'inquiry_no','잠금/오픈':'lock_state','상태':'status','문의일시':'inquired_at','차량명':'car_name','등급':'grade','트림':'trim_name','옵션':'options','차량색상':'car_color','내장색상':'interior_color','차량가':'car_price','옵션가':'option_price','이용방법':'usage_method','이용기간':'term_months','연간주행거리':'annual_km','보험연령':'insurance_age','선납금':'prepayment','보증금':'deposit','월납입금':'monthly_pay','고객유형':'customer_type','알림유형':'alert_type','담당자명':'manager','담당자팀':'team','할당그룹':'assign_group','할당타입':'assign_type','할당시간':'assigned_at','중복여부':'is_duplicate','광고매체':'media','신용도':'credit','등록일시':'registered_at','수정일시':'updated_at','유입링크':'inbound_link','유입키워드':'inbound_keyword','utm_source':'utm_source','utm_medium':'utm_medium','utm_campaign':'utm_campaign','utm_term':'utm_term','utm_content':'utm_content','utm_creative':'utm_creative','utm_network':'utm_network'};
+const INQ_PII = ['고객명','고객IP'];
+const INQ_CONSENT = ['개인정보수집동의','광고성정보수신동의','광고성정보수신동의(메일)','광고성정보수신동의(모바일)','제3자정보제공동의','마케팅활용및수집동의','통화녹음및AI활용동의'];
+const SALE_MAP = {'No.':'src_no','상태':'status','등록일시':'registered_at','차량명':'car_name','차량가격':'car_price','옵션가격':'option_price','계약마진':'margin','유입매체':'media','유입링크':'inbound_link','유입키워드':'inbound_keyword','문의일자':'inquiry_date','계약일자':'contract_date'};
+const NUM_COLS = new Set(['car_price','option_price','prepayment','deposit','monthly_pay','margin']);
+const TS_COLS  = new Set(['inquired_at','assigned_at','registered_at','updated_at']);
+const DATE_COLS= new Set(['inquiry_date','contract_date']);
+const INT_COLS = new Set(['src_no']);
+
+const pad=n=>String(n).padStart(2,'0');
+function fmtDateObj(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; }
+function str(v){ if(v==null) return null; if(v instanceof Date) return fmtDateObj(v); const s=String(v).trim(); return s===''?null:s; }
+function toTs(v){ const s=str(v); if(!s) return null; const m=s.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/); if(!m) return {bad:s}; return `${m[1]}-${pad(m[2])}-${pad(m[3])} ${pad(m[4]||0)}:${m[5]||'00'}:${m[6]||'00'}+09:00`; }
+function toDate(v){ const s=str(v); if(!s) return null; const m=s.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/); if(!m) return {bad:s}; return `${m[1]}-${pad(m[2])}-${pad(m[3])}`; }
+function toNum(v){ const s=str(v); if(s==null) return null; const n=Number(s.replace(/,/g,'')); return isFinite(n)? n : {bad:s}; }
+function readSheet(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onerror=rej; r.onload=e=>{ try{
+  let wb; const u8=new Uint8Array(e.target.result);
+  if(/\.csv$/i.test(file.name)){ let txt=new TextDecoder('utf-8',{fatal:false}).decode(u8); if(/\uFFFD/.test(txt)) txt=new TextDecoder('euc-kr').decode(u8); wb=XLSX.read(txt,{type:'string',raw:true}); }
+  else wb=XLSX.read(u8,{type:'array',cellDates:true});
+  const ws=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  while(rows.length && rows[rows.length-1].every(v=>v==null)) rows.pop();
+  res(rows); }catch(err){ rej(err); } }; r.readAsArrayBuffer(file); }); }
+async function sha256(file){ const b=await file.arrayBuffer(); const h=await crypto.subtle.digest('SHA-256',b); return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+
+let UP=null; // 검증 결과
+async function parseUpload(){
+  const file=$('#upFile').files[0]; if(!file) return toast('파일을 선택하세요');
+  const kind=$('#upKind').value; $('#upMsg').textContent='파일 읽는 중…'; $('#upGo').disabled=true; $('#upPreview').innerHTML='';
+  try{
+    const rows=await readSheet(file); if(rows.length<2) throw new Error('데이터 행이 없습니다');
+    const header=rows[0].map(h=>str(h)); const MAP = kind==='inquiry'? INQ_MAP : SALE_MAP;
+    const required = kind==='inquiry'? ['문의번호','문의일시','광고매체'] : ['유입매체','문의일자','계약일자','차량가격'];
+    const missing=required.filter(h=>!header.includes(h)); if(missing.length) throw new Error('필수 컬럼이 없습니다: '+missing.join(', ')+'\n파일 헤더: '+header.join(' | '));
+    const pii=$('#upPii').checked && kind==='inquiry';
+    const unknown=header.filter(h=>h && !MAP[h] && !INQ_PII.includes(h) && !(kind==='inquiry'&&INQ_CONSENT.includes(h)));
+    const out=[], bad={ts:0,date:0,num:0,examples:[]}; const seen=new Map(); let dupInFile=0, empty=0;
+    for(let i=1;i<rows.length;i++){
+      const r=rows[i]; if(!r || r.every(v=>v==null)) { empty++; continue; }
+      const o={}, raw={}, consents={};
+      header.forEach((h,j)=>{ if(h==null) return; const v=r[j];
+        if(INQ_PII.includes(h)){ if(!pii) raw[h]=str(v); return; }
+        if(kind==='inquiry'&&INQ_CONSENT.includes(h)){ consents[h]=str(v); return; }
+        const col=MAP[h]; if(!col){ raw[h]=str(v); return; }
+        let x;
+        if(TS_COLS.has(col)){ x=toTs(v); if(x&&x.bad){ bad.ts++; if(bad.examples.length<5) bad.examples.push(`${h}: "${x.bad}"`); raw[h+'(원문)']=x.bad; x=null; } }
+        else if(DATE_COLS.has(col)){ x=toDate(v); if(x&&x.bad){ bad.date++; if(bad.examples.length<5) bad.examples.push(`${h}: "${x.bad}"`); raw[h+'(원문)']=x.bad; x=null; } }
+        else if(NUM_COLS.has(col)){ x=toNum(v); if(x&&x.bad!==undefined){ bad.num++; raw[h+'(원문)']=x.bad; x=null; } }
+        else if(INT_COLS.has(col)){ x=toNum(v); if(x&&x.bad!==undefined){ raw[h+'(원문)']=x.bad; x=null; } else if(x!=null) x=Math.trunc(x); }
+        else x=str(v);
+        o[col]=x; });
+      if(kind==='inquiry'){ o.consents=consents; if(!o.inquiry_no){ raw['_행']=i+1; o.inquiry_no='NOKEY-'+file.name+'-'+(i+1); } if(seen.has(o.inquiry_no)){ dupInFile++; out[seen.get(o.inquiry_no)]=o; } else { seen.set(o.inquiry_no,out.length); } }
+      o.raw=Object.keys(raw).length? raw : null;
+      if(kind==='inquiry'){ if(!seen.has(o.inquiry_no)||seen.get(o.inquiry_no)===out.length) out.push(o); } else out.push(o);
+    }
+    const hash=await sha256(file);
+    const {data:same}=await sb.from('upload_batches').select('id,uploaded_at,row_count,is_active').eq('file_hash',hash).eq('kind',kind);
+    const dateCol = kind==='inquiry'?'inquired_at':'contract_date'; const ds=out.map(o=>o[dateCol]).filter(Boolean).sort();
+    const medias=new Set(out.map(o=>o.media).filter(Boolean));
+    UP={kind,file,rows:out,hash,header};
+    let msg=`<b>검증 완료</b> — ${fmt(out.length)}행 (빈 행 ${empty} 제외)`;
+    if(kind==='inquiry') msg+=` · 파일 내 문의번호 중복 ${dupInFile}건(마지막 행 기준 반영)`;
+    msg+=` · ${dateCol==='inquired_at'?'문의일시':'계약일자'} ${ds[0]?.slice(0,10)||'-'} ~ ${ds[ds.length-1]?.slice(0,10)||'-'} · 매체 ${medias.size}종`;
+    if(unknown.length) msg+=`<br><span class="pill">알 수 없는 컬럼 ${unknown.length}개 → raw(JSON)에 보존: ${esc(unknown.join(', '))}</span>`;
+    if(bad.ts||bad.date||bad.num) msg+=`<br><span class="pill warn">형식 해석 불가 값: 일시 ${bad.ts} · 일자 ${bad.date} · 숫자 ${bad.num} → 해당 셀은 비우고 원문을 raw에 보존</span> <span class="muted">${esc(bad.examples.join(' / '))}</span>`;
+    if(same&&same.length) msg+=`<br><span class="pill bad">동일한 파일이 이미 업로드되어 있습니다 (배치 #${same.map(s=>s.id).join(', #')}). 계속하면 ${kind==='inquiry'?'같은 문의번호가 갱신됩니다(중복 생성 없음)':'중복 배치가 생성됩니다 — 이전 배치를 비활성화하세요'}.</span>`;
+    $('#upMsg').innerHTML=msg;
+    const prev=out.slice(0,8); const cols=Object.keys(prev[0]||{}).filter(c=>!['raw','consents'].includes(c));
+    $('#upPreview').innerHTML='<div class="tw"><table><thead><tr>'+cols.map(c=>`<th class="l">${c}</th>`).join('')+'</tr></thead><tbody>'+prev.map(o=>'<tr>'+cols.map(c=>`<td class="l">${esc(o[c])}</td>`).join('')+'</tr>').join('')+'</tbody></table></div>';
+    $('#upGo').disabled=false;
+  }catch(e){ $('#upMsg').innerHTML='<span class="pill bad">검증 실패</span> '+esc(sqlErr(e)).replace(/\n/g,'<br>'); }
+}
+async function doUpload(){
+  if(!UP) return; const {kind,rows,file,hash}=UP; $('#upGo').disabled=true; const bar=$('#upBar'); bar.style.width='0%';
+  try{
+    const {data:b,error:be}=await sb.from('upload_batches').insert({kind, filename:file.name, file_hash:hash, note:$('#upNote').value||null, uploaded_by:user.email}).select().single(); if(be) throw be;
+    const CH=500; let done=0;
+    for(let i=0;i<rows.length;i+=CH){
+      const chunk=rows.slice(i,i+CH).map(o=>({...o, batch_id:b.id}));
+      const q = kind==='inquiry' ? sb.from('inquiries').upsert(chunk,{onConflict:'inquiry_no'}) : sb.from('sales').insert(chunk);
+      const {error}=await q; if(error) throw new Error(`행 ${i+2}~${i+1+chunk.length} 저장 실패: `+sqlErr(error));
+      done+=chunk.length; bar.style.width=(100*done/rows.length).toFixed(1)+'%'; $('#upMsg').textContent=`업로드 중… ${fmt(done)} / ${fmt(rows.length)}`;
+    }
+    await sb.from('upload_batches').update({row_count:done}).eq('id',b.id);
+    $('#upMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(done)}행 저장 (배치 #${b.id})`; toast('업로드 완료'); UP=null; $('#upFile').value=''; loadBatches();
+  }catch(e){ $('#upMsg').innerHTML='<span class="pill bad">업로드 중단</span> '+esc(sqlErr(e))+' — 이미 저장된 행은 유지됩니다. 같은 파일을 다시 검증·업로드하면 유입은 갱신, 매출은 새 배치로 들어가므로 실패한 배치는 비활성화하세요.'; $('#upGo').disabled=false; }
+}
+async function loadBatches(){
+  try{
+    const {data,error}=await sb.from('upload_batches').select('*').order('id',{ascending:false}).limit(200); if(error) throw error;
+    renderTable('tBatches', ['#','종류','파일','행수','메모','업로더','일시','상태',''], data.map(b=>[b.id, b.kind==='inquiry'?'유입':b.kind==='sales'?'매출':'광고비', esc(b.filename), fmt(b.row_count), esc(b.note||''), esc(b.uploaded_by||''), (b.uploaded_at||'').replace('T',' ').slice(0,16),
+      b.kind==='sales' ? (b.is_active?'<span class="pill ok">활성</span>':'<span class="pill">비활성</span>') : '-',
+      b.kind==='sales' ? `<button class="btn sec sm" onclick="toggleBatch(${b.id},${!b.is_active})">${b.is_active?'비활성화':'활성화'}</button>` : '']), {left:[1,2,4,5,6,7]});
+  }catch(e){ toast('이력 조회 실패: '+sqlErr(e)); }
+}
+async function toggleBatch(id, active){ const {error}=await sb.from('upload_batches').update({is_active:active}).eq('id',id); if(error) return toast(sqlErr(error)); loadBatches(); }
+
+/* ============================ 광고비 ============================ */
+async function loadMediaStdList(){
+  try{ const rows=await selectAll('media_map', q=>q.select('media_std,media_type')); const set=[...new Set(rows.map(r=>r.media_std))].sort((a,b)=>a.localeCompare(b,'ko')); $('#mediaStdList').innerHTML=set.map(s=>`<option value="${esc(s)}">`).join(''); }catch(e){}
+}
+async function saveSpend(){
+  const row={spend_date:$('#spDate').value, media_std:$('#spMedia').value.trim(), cost:+$('#spCost').value||0, impressions:$('#spImp').value?+$('#spImp').value:null, clicks:$('#spClk').value?+$('#spClk').value:null, memo:$('#spMemo').value||null, updated_at:new Date().toISOString()};
+  if(!row.spend_date||!row.media_std) return toast('일자와 매체를 입력하세요');
+  const {error}=await sb.from('ad_spend').upsert(row,{onConflict:'spend_date,media_std'}); if(error) return toast(sqlErr(error));
+  toast('저장됨'); $('#spCost').value=''; $('#spImp').value=''; $('#spClk').value=''; loadSpend();
+}
+async function loadSpend(){
+  const m=$('#spMonth').value; if(!m) return; const from=m+'-01'; const to=new Date(+m.slice(0,4), +m.slice(5,7), 0).toISOString().slice(0,10);
+  const {data,error}=await sb.from('ad_spend').select('*').gte('spend_date',from).lte('spend_date',to).order('spend_date',{ascending:false}).order('media_std').limit(2000); if(error) return toast(sqlErr(error));
+  const tot=data.reduce((a,r)=>a+ +r.cost,0);
+  renderTable('tSpend', ['일자','매체','광고비','노출','클릭','메모',''], data.map(r=>[r.spend_date, esc(r.media_std), fmt(r.cost), fmt(r.impressions), fmt(r.clicks), esc(r.memo||''), `<button class="btn sec sm" onclick="delSpend('${r.spend_date}','${esc(r.media_std).replace(/'/g,"\\'")}')">삭제</button>`]), {left:[0,1,5], foot:['합계','',fmt(tot),'','','','']});
+}
+async function delSpend(d,m){ if(!confirm(`${d} ${m} 광고비를 삭제할까요?`)) return; const {error}=await sb.from('ad_spend').delete().eq('spend_date',d).eq('media_std',m); if(error) return toast(sqlErr(error)); loadSpend(); }
+function downloadSpendTemplate(){ csvDownload('광고비_양식.csv', [['일자','매체','광고비','노출','클릭','메모'],['2026-10-01','사이트-KS오토플랜','1500000','120000','3400','']]); }
+async function uploadSpend(){
+  const file=$('#spFile').files[0]; if(!file) return toast('파일을 선택하세요');
+  try{
+    const rows=await readSheet(file); const h=rows[0].map(str); const ix=n=>h.indexOf(n);
+    if(ix('일자')<0||ix('매체')<0||ix('광고비')<0) throw new Error('헤더에 일자, 매체, 광고비 가 필요합니다');
+    const stds=new Set((await selectAll('media_map', q=>q.select('media_std'))).map(r=>r.media_std));
+    const out=[], unknown=new Set(), badDate=[];
+    for(let i=1;i<rows.length;i++){ const r=rows[i]; if(!r||r.every(v=>v==null)) continue;
+      const d=toDate(r[ix('일자')]); if(!d||d.bad){ badDate.push(i+1); continue; }
+      const m=str(r[ix('매체')]); if(!m) continue; if(!stds.has(m)) unknown.add(m);
+      out.push({spend_date:d, media_std:m, cost:toNum(r[ix('광고비')])?.bad!==undefined?0:(toNum(r[ix('광고비')])||0), impressions: ix('노출')>=0? (toNum(r[ix('노출')])?.bad!==undefined?null:toNum(r[ix('노출')])) : null, clicks: ix('클릭')>=0? (toNum(r[ix('클릭')])?.bad!==undefined?null:toNum(r[ix('클릭')])) : null, memo: ix('메모')>=0? str(r[ix('메모')]) : null, updated_at:new Date().toISOString()}); }
+    if(unknown.size && !confirm(`매체 마스터의 표준매체명과 일치하지 않는 매체 ${unknown.size}종이 있습니다:\n${[...unknown].slice(0,15).join('\n')}\n\n그대로 저장할까요? (집계에서 유입 DB와 연결되지 않습니다)`)) return;
+    // 같은 키 중복 제거(마지막 행 우선)
+    const mp=new Map(); out.forEach(o=>mp.set(o.spend_date+'|'+o.media_std,o)); const rows2=[...mp.values()];
+    for(let i=0;i<rows2.length;i+=500){ const {error}=await sb.from('ad_spend').upsert(rows2.slice(i,i+500),{onConflict:'spend_date,media_std'}); if(error) throw error; }
+    await sb.from('upload_batches').insert({kind:'ad_spend', filename:file.name, row_count:rows2.length, uploaded_by:user.email});
+    $('#spMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(rows2.length)}행 저장` + (badDate.length?` · 일자 해석 불가 ${badDate.length}행 건너뜀 (행 ${badDate.slice(0,10).join(', ')})`:'');
+    $('#spFile').value=''; loadSpend();
+  }catch(e){ $('#spMsg').innerHTML='<span class="pill bad">실패</span> '+esc(sqlErr(e)); }
+}
+
+/* ============================ 매핑 ============================ */
+let MM=[], CM=[];
+async function loadMediaMap(){
+  try{
+    MM=await selectAll('v_media_counts'); const f=$('#mmFilter').value, s=$('#mmSearch').value.trim();
+    let rows=MM.filter(r=>(f==='all'||r.media_type==='미분류') && (!s||r.media_raw.includes(s)||(r.media_std||'').includes(s))).sort((a,b)=>b.inquiry_count-a.inquiry_count);
+    $('#mmMsg').textContent=`${rows.length}종 표시 / 전체 ${MM.length}종`;
+    const types=['유료광고','오가닉','내부','경비','미분류'];
+    renderTable('tMediaMap', ['매체 원문(유입)','유입DB','매출건','표준매체명','유형','플랫폼','브랜드','메모'], rows.map(r=>[esc(r.media_raw), fmt(r.inquiry_count), fmt(r.sales_count),
+      `<input data-k="${esc(r.media_raw)}" data-f="media_std" value="${esc(r.media_std)}" style="width:220px" onchange="mmDirty(this)">`,
+      `<select data-k="${esc(r.media_raw)}" data-f="media_type" onchange="mmDirty(this)">${types.map(t=>`<option ${t===r.media_type?'selected':''}>${t}</option>`).join('')}</select>`,
+      `<input data-k="${esc(r.media_raw)}" data-f="platform" value="${esc(r.platform||'')}" style="width:100px" onchange="mmDirty(this)">`,
+      `<input data-k="${esc(r.media_raw)}" data-f="brand" value="${esc(r.brand||'')}" style="width:160px" onchange="mmDirty(this)">`,
+      `<input data-k="${esc(r.media_raw)}" data-f="memo" value="${esc(r.memo||'')}" style="width:140px" onchange="mmDirty(this)">`]), {left:[0,3,4,5,6,7]});
+  }catch(e){ toast('매체 마스터 조회 실패: '+sqlErr(e)); }
+}
+const mmDirtyKeys=new Set(); function mmDirty(el){ mmDirtyKeys.add(el.dataset.k); el.style.background='#fff7e6'; }
+async function saveMediaMap(){
+  if(!mmDirtyKeys.size) return toast('변경된 행이 없습니다');
+  const ups=[...mmDirtyKeys].map(k=>{ const g=f=>document.querySelector(`#tMediaMap [data-k="${CSS.escape(k)}"][data-f="${f}"]`)?.value; const std=(g('media_std')||'').trim()||k;
+    return {media_raw:k, media_std:std, media_type:g('media_type'), platform:(g('platform')||'').trim()||null, brand:(g('brand')||'').trim()||null, memo:(g('memo')||'').trim()||null, updated_at:new Date().toISOString()}; });
+  const {error}=await sb.from('media_map').upsert(ups,{onConflict:'media_raw'}); if(error) return toast(sqlErr(error));
+  mmDirtyKeys.clear(); toast(`${ups.length}건 저장`); loadMediaMap(); loadMediaStdList();
+}
+async function loadCarMap(){
+  try{
+    const f=$('#cmFilter').value, s=$('#cmSearch').value.trim(), lim=+$('#cmLimit').value;
+    let q=sb.from('v_car_counts').select('*');
+    if(f==='unmapped') q=q.is('brand',null); if(f==='auto') q=q.like('mapped_by','자동%');
+    if(s) q=q.ilike('car_raw',`%${s}%`);
+    const {data,error}=await q.limit(5000); if(error) throw error;
+    CM=data.sort((a,b)=>(b.inquiry_count+b.sales_count*20)-(a.inquiry_count+a.sales_count*20)).slice(0,lim);
+    const brands=[...new Set(data.map(r=>r.brand).filter(Boolean))].sort(); $('#brandList').innerHTML=brands.map(b=>`<option value="${esc(b)}">`).join('');
+    $('#cmMsg').textContent=`${CM.length}종 표시 (매출 건수 가중 정렬)`;
+    renderTable('tCarMap', ['차량명 원문','유입DB','매출건','브랜드','표준모델명','차급','매핑'], CM.map(r=>[esc(r.car_raw), fmt(r.inquiry_count), fmt(r.sales_count),
+      `<input list="brandList" data-k="${esc(r.car_raw)}" data-f="brand" value="${esc(r.brand||'')}" style="width:110px" onchange="cmDirty(this)">`,
+      `<input data-k="${esc(r.car_raw)}" data-f="model_std" value="${esc(r.model_std||'')}" style="width:200px" onchange="cmDirty(this)">`,
+      `<input data-k="${esc(r.car_raw)}" data-f="segment" value="${esc(r.segment||'')}" style="width:90px" onchange="cmDirty(this)">`,
+      esc(r.mapped_by||'')]), {left:[0,3,4,5,6]});
+  }catch(e){ toast('차량 마스터 조회 실패: '+sqlErr(e)); }
+}
+const cmDirtyKeys=new Set(); function cmDirty(el){ cmDirtyKeys.add(el.dataset.k); el.style.background='#fff7e6'; }
+async function saveCarMap(){
+  if(!cmDirtyKeys.size) return toast('변경된 행이 없습니다');
+  const ups=[...cmDirtyKeys].map(k=>{ const g=f=>document.querySelector(`#tCarMap [data-k="${CSS.escape(k)}"][data-f="${f}"]`)?.value;
+    return {car_raw:k, brand:(g('brand')||'').trim()||null, model_std:(g('model_std')||'').trim()||null, segment:(g('segment')||'').trim()||null, mapped_by:'수기', updated_at:new Date().toISOString()}; });
+  const {error}=await sb.from('car_map').upsert(ups,{onConflict:'car_raw'}); if(error) return toast(sqlErr(error));
+  cmDirtyKeys.clear(); toast(`${ups.length}건 저장`); loadCarMap();
+}
+
+/* ============================ 다운로드 ============================ */
+function csvDownload(name, rows){ const csv='\uFEFF'+rows.map(r=>r.map(v=>{ const s=v==null?'':String(v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(',')).join('\r\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download=name; a.click(); }
+function objsToRows(objs, cols){ cols=cols||[...new Set(objs.flatMap(o=>Object.keys(o)))]; return [cols, ...objs.map(o=>cols.map(c=>typeof o[c]==='object'&&o[c]!=null? JSON.stringify(o[c]) : o[c]))]; }
+async function dl(kind){
+  $('#dlMsg').textContent='준비 중…';
+  try{
+    const f=DASH.f||filters(); const tag=`${f.from}_${f.to}`; const rate=r=>({...r, roas:r.cost?+(r.revenue/r.cost).toFixed(2):null, cpa_db:r.cost&&r.net_db?Math.round(r.cost/r.net_db):null, cpa_contract:r.cost&&r.contracts?Math.round(r.cost/r.contracts):null, conv_rate:r.net_db?+(100*r.contracts/r.net_db).toFixed(2):null});
+    if(kind==='media_period'){ if(!DASH.P) await loadDash(); csvDownload(`매체x기간_${f.grain}_${tag}.csv`, objsToRows(DASH.P.map(rate))); }
+    else if(kind==='media_total'){ if(!DASH.M) await loadDash(); csvDownload(`매체별합계_${tag}.csv`, objsToRows(DASH.M.map(rate))); }
+    else if(kind==='car'){ if(!DASH.C) await loadDash(); csvDownload(`차량별집계_${tag}.csv`, objsToRows(DASH.C)); }
+    else if(kind==='lead_media'){ if(!DASH.LM) await loadDash(); csvDownload(`리드타임_매체별_${tag}.csv`, objsToRows(DASH.LM)); }
+    else if(kind==='lead_car'){ if(!DASH.LC) await loadDash(); csvDownload(`리드타임_차량별_${tag}.csv`, objsToRows(DASH.LC)); }
+    else if(kind==='unmatched'){ const rows=await selectAll('v_sales_unmatched'); csvDownload('미매칭매출.csv', objsToRows(rows)); }
+    else if(kind==='media_map'){ const rows=await selectAll('v_media_counts'); csvDownload('매체마스터.csv', objsToRows(rows)); }
+    else if(kind==='car_map'){ const rows=await selectAll('v_car_counts'); csvDownload('차량마스터.csv', objsToRows(rows)); }
+    else if(kind==='ad_spend'){ const rows=await selectAll('ad_spend', q=>q.order('spend_date')); csvDownload('광고비전체.csv', objsToRows(rows)); }
+    $('#dlMsg').textContent='다운로드 완료';
+  }catch(e){ $('#dlMsg').textContent='실패: '+sqlErr(e); }
+}
+
+/* ============================ 설정 ============================ */
+async function showStatus(){ try{ const st=await rpc('fn_data_status',{}); $('#setStatus').textContent=JSON.stringify(st,null,2); }catch(e){ $('#setStatus').textContent=sqlErr(e); } }
+
+init();
+</script>
+</body>
+</html>
