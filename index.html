@@ -119,8 +119,7 @@
         <label title="CRM이 중복여부=Y로 표시한 문의 제외"><input type="checkbox" id="fDupCrm" checked>CRM 중복(중복여부=Y)</label>
         <label title="같은 IP로 7일 내 재문의 제외 (IP는 해시로만 저장)"><input type="checkbox" id="fDupIp">IP 중복(7일)</label></div></div>
       <div><label>매체유형 포함</label><div class="chk" id="fTypes">
-        <label><input type="checkbox" value="유료광고" checked>유료광고</label>
-        <label><input type="checkbox" value="오가닉" checked>오가닉</label>
+        <label><input type="checkbox" value="마케팅" checked>마케팅</label>
         <label><input type="checkbox" value="미분류" checked>미분류</label>
         <label><input type="checkbox" value="내부">내부</label>
         <label><input type="checkbox" value="경비">경비</label></div></div>
@@ -234,7 +233,7 @@
 <!-- ================= 매핑 ================= -->
 <section class="page" id="p-map">
   <div class="card">
-    <h2>매체 마스터 <span class="muted">(유입 광고매체 기준 · 표준매체명/유형/플랫폼/브랜드를 채우세요)</span></h2>
+    <h2>매체 마스터 <span class="muted">(유입 광고매체 기준 · 유형: 마케팅=광고·유입 성과 집계 대상 / 내부=영업·소개·추가계약 / 경비=정산 처리 행)</span></h2>
     <div class="row">
       <div><label>필터</label><select id="mmFilter"><option value="all">전체</option><option value="unc" selected>미분류만</option></select></div>
       <div><label>검색</label><input id="mmSearch" placeholder="매체명"></div>
@@ -659,7 +658,7 @@ async function loadMediaMap(){
     MM=await selectAll('v_media_counts'); const f=$('#mmFilter').value, s=$('#mmSearch').value.trim();
     let rows=MM.filter(r=>(f==='all'||r.media_type==='미분류') && (!s||r.media_raw.includes(s)||(r.media_std||'').includes(s))).sort((a,b)=>b.inquiry_count-a.inquiry_count);
     $('#mmMsg').textContent=`${rows.length}종 표시 / 전체 ${MM.length}종`;
-    const types=['유료광고','오가닉','내부','경비','미분류'];
+    const types=['마케팅','내부','경비','미분류'];
     renderTable('tMediaMap', ['매체 원문(유입)','유입DB','매출건','표준매체명','유형','플랫폼','브랜드','메모'], rows.map(r=>[esc(r.media_raw), fmt(r.inquiry_count), fmt(r.sales_count),
       `<input data-k="${esc(r.media_raw)}" data-f="media_std" value="${esc(r.media_std)}" style="width:220px" onchange="mmDirty(this)">`,
       `<select data-k="${esc(r.media_raw)}" data-f="media_type" onchange="mmDirty(this)">${types.map(t=>`<option ${t===r.media_type?'selected':''}>${t}</option>`).join('')}</select>`,
