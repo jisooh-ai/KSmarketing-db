@@ -45,8 +45,8 @@
   .kpi .l{font-size:12px;color:var(--muted)}
   .kpi .v{font-size:20px;font-weight:700;margin-top:2px}
   .kpi .s{font-size:11px;color:var(--muted)}
-  table{border-collapse:collapse;width:100%;font-size:13px}
-  th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:right;white-space:nowrap}
+  table{border-collapse:collapse;width:100%;font-size:12px}
+  th,td{border-bottom:1px solid var(--line);padding:5px 7px;text-align:right;white-space:nowrap}
   th{background:#fafbfc;position:sticky;top:0;cursor:pointer;user-select:none}
   th:first-child,td:first-child{text-align:left}
   td.l,th.l{text-align:left}
@@ -137,11 +137,12 @@
     <div class="tw" style="margin-top:10px"><table id="tTrend"></table></div>
   </div>
 
+  <div class="card"><h2>브랜드별 요약 <span class="muted">(매체 마스터의 브랜드 기준)</span></h2><div class="tw"><table id="tBrand"></table></div></div>
   <div class="grid2">
-    <div class="card"><h2>매체별 성과 <span class="muted">(선택 기간 합계)</span></h2><canvas id="chMedia"></canvas><div class="tw" style="margin-top:10px"><table id="tMedia"></table></div></div>
-    <div class="card"><h2>브랜드별 요약 <span class="muted">(매체 마스터의 브랜드 기준)</span></h2><div class="tw"><table id="tBrand"></table></div>
-      <h3>플랫폼별</h3><div class="tw"><table id="tPlatform"></table></div></div>
+    <div class="card"><h2>플랫폼별</h2><div class="tw"><table id="tPlatform"></table></div></div>
+    <div class="card"><h2>매체별 DB·계약 TOP 15</h2><canvas id="chMedia" style="max-height:420px"></canvas></div>
   </div>
+  <div class="card"><h2>매체별 성과 <span class="muted">(선택 기간 합계 · 리드타임은 정상 계약 기준)</span></h2><div class="tw" style="max-height:560px"><table id="tMedia"></table></div></div>
 
   <div class="grid2">
     <div class="card"><h2>문의 많은 차량 TOP 15</h2><div class="tw"><table id="tCarInq"></table></div></div>
@@ -155,6 +156,10 @@
     <div class="grid2" style="margin-top:12px">
       <div><h3>분포</h3><canvas id="chLead"></canvas></div>
       <div><h3>차량 브랜드별</h3><div class="tw"><table id="tLeadBrand"></table></div></div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div><h3>자사 브랜드별 (매체 마스터 브랜드)</h3><div class="tw"><table id="tLeadMBrand"></table></div></div>
+      <div><h3>플랫폼별</h3><div class="tw"><table id="tLeadPlatform"></table></div></div>
     </div>
     <div class="grid2" style="margin-top:12px">
       <div><h3>매체별 (계약 5건 이상)</h3><div class="tw"><table id="tLeadMedia"></table></div></div>
@@ -422,16 +427,18 @@ async function loadDash(){
       rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:f.basis}),
       rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:'all',p_basis:f.basis}),
       rpc('fn_car_summary',{p_from:f.from,p_to:f.to,p_basis:f.basis})]);
-    const [L0, LM, LC, LB, LD] = await Promise.all([
+    const [L0, LM, LC, LB, LD, LMB, LPL] = await Promise.all([
       rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'all'}),
       rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'media'}),
       rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'car'}),
       rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'car_brand'}),
       rpc('fn_leadtime_dist',{p_from:f.from,p_to:f.to,p_basis:f.basis}),
+      rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'media_brand'}),
+      rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'platform'}),
     ]);
     const inc = r => f.types.includes(r.media_type);
     const Pf=P.filter(inc), Mf=M.filter(inc);
-    DASH={f, P:Pf, M:Mf, C, L0, LM, LC, LB, LD};
+    DASH={f, P:Pf, M:Mf, C, L0, LM, LC, LB, LD, LMB, LPL};
     const unc = M.filter(r=>r.media_type==='미분류').length;
     $('#status').innerHTML = `유입 ${fmt(st.inquiries)}건 (${(st.inquiry_min||'').slice(0,10)} ~ ${(st.inquiry_max||'').slice(0,10)}) · 활성 매출 ${fmt(st.sales_active)}건 (계약일 ${st.contract_min||'-'} ~ ${st.contract_max||'-'}) · 광고비 입력 ${fmt(st.ad_spend_days)}일 (최근 ${st.ad_spend_max||'-'})`
       + (st.sales_unmatched? ` · <span class="pill warn">미매칭 매출 ${fmt(st.sales_unmatched)}건 (유입 매체에 없음, 집계 제외)</span>`:'')
@@ -457,9 +464,11 @@ async function loadDash(){
 
     // 추이
     const byP=groupBy(Pf, r=>r.period); const periods=[...byP.keys()].sort();
-    const tr = periods.map(p=>{ const x=sumRows(byP.get(p),f); return {p, ...x}; });
-    renderTable('tTrend', ['기간',...METRIC_H], tr.map(x=>[x.p, ...metricCols(x)]), {foot:['합계',...metricCols(s)]});
-    chart('chTrend',{data:{labels:periods, datasets:[
+    const plabel = p => { if(f.grain==='month') return p.slice(0,7); if(f.grain==='year') return p.slice(0,4);
+      if(f.grain==='week'){ const d=new Date(p+'T00:00:00'); const e=new Date(d); e.setDate(d.getDate()+6); const md=x=>`${x.getMonth()+1}/${x.getDate()}`; return `${md(d)}~${md(e)} 주`; } return p; };
+    const tr = periods.map(p=>{ const x=sumRows(byP.get(p),f); return {p, label:plabel(p), ...x}; });
+    renderTable('tTrend', ['기간',...METRIC_H], tr.map(x=>[x.label, ...metricCols(x)]), {foot:['합계',...metricCols(s)]});
+    chart('chTrend',{data:{labels:tr.map(x=>x.label), datasets:[
       {type:'bar',label:'DB(전체)',data:tr.map(x=>x.db),backgroundColor:'rgba(37,99,235,.18)',yAxisID:'y'},
       {type:'bar',label:'DB('+f.dbLabel+')',data:tr.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.55)',yAxisID:'y'},
       {type:'bar',label:'계약수',data:tr.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.6)',yAxisID:'y'},
@@ -468,8 +477,9 @@ async function loadDash(){
       options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{callback:v=>won(v)}}}}});
 
     // 매체별
-    const byM=groupBy(Mf, r=>r.media_std); const mr=[...byM.entries()].map(([k,rows])=>({k, type:rows[0].media_type, brand:rows[0].brand, ...sumRows(rows,f)})).sort((a,b)=>b.dbSel-a.dbSel);
-    renderTable('tMedia', ['매체','유형','브랜드',...METRIC_H], mr.map(x=>[esc(x.k), esc(x.type), esc(x.brand??''), ...metricCols(x)]), {left:[0,1,2], foot:['합계','','',...metricCols(s)]});
+    const ltByMedia=new Map(LM.map(x=>[x.dim_value,x]));
+    const byM=groupBy(Mf, r=>r.media_std); const mr=[...byM.entries()].map(([k,rows])=>({k, type:rows[0].media_type, brand:rows[0].brand, lt:ltByMedia.get(k), ...sumRows(rows,f)})).sort((a,b)=>b.dbSel-a.dbSel);
+    renderTable('tMedia', ['매체','유형','브랜드',...METRIC_H,'리드타임 중앙값','리드타임 평균','7일내'], mr.map(x=>[esc(x.k), esc(x.type), esc(x.brand??''), ...metricCols(x), x.lt?fmt(x.lt.median_days,1)+'일':'-', x.lt?fmt(x.lt.avg_days,1)+'일':'-', x.lt?fmt(x.lt.within7_pct,1)+'%':'-']), {left:[0,1,2], foot:['합계','','',...metricCols(s), lt.n?fmt(lt.median_days,1)+'일':'-', lt.n?fmt(lt.avg_days,1)+'일':'-', lt.n?fmt(lt.within7_pct,1)+'%':'-']});
     const top=mr.slice(0,15);
     chart('chMedia',{type:'bar',data:{labels:top.map(x=>x.k),datasets:[{label:'DB(전체)',data:top.map(x=>x.db),backgroundColor:'rgba(37,99,235,.25)'},{label:'DB('+f.dbLabel+')',data:top.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.7)'},{label:'계약수',data:top.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.8)'}]},options:{indexAxis:'y',scales:{x:{beginAtZero:true}}}});
 
@@ -495,6 +505,8 @@ async function loadDash(){
     const ltRow = x => [esc(x.dim_value??'(없음)'), fmt(x.n), fmt(x.avg_days,1), fmt(x.median_days,1), fmt(x.p25,0)+' / '+fmt(x.p75,0), fmt(x.within7_pct,1)+'%'];
     const LTH=['구분','건수','평균(일)','중앙값(일)','25%/75%','7일내'];
     renderTable('tLeadBrand', LTH, LB.map(ltRow));
+    renderTable('tLeadMBrand', LTH, LMB.map(ltRow));
+    renderTable('tLeadPlatform', LTH, LPL.map(ltRow));
     renderTable('tLeadMedia', LTH, LM.filter(x=>x.n>=5).map(ltRow));
     renderTable('tLeadCar', LTH, LC.filter(x=>x.n>=5).map(ltRow));
   }catch(e){ $('#status').innerHTML='<span class="pill bad">오류</span> '+esc(sqlErr(e)); }
