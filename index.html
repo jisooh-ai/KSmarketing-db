@@ -73,6 +73,20 @@
   .ms .pop label{display:flex;gap:6px;align-items:center;padding:2px 2px;font-size:13px;color:var(--text)}
   .ms .pop .tools{display:flex;gap:6px;margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:6px}
   .pre{font-family:ui-monospace,monospace;font-size:12px;background:#f8fafc;padding:8px;border-radius:6px;white-space:pre-wrap}
+  .rpt-head{display:none}
+  @media print{
+    @page{size:A4 landscape;margin:10mm}
+    header,#login,#loading,.toast,#filterCard,.ms,#fGrain,#fLeadGrain,#trendMsg,#leadMsg{display:none !important}
+    body{background:#fff}
+    main{max-width:none;padding:0}
+    section.page{display:none} section.page#p-dash{display:block !important}
+    .rpt-head{display:block;margin-bottom:10px}
+    .card{break-inside:avoid;box-shadow:none;border-color:#ccd}
+    .tw{max-height:none !important;overflow:visible !important}
+    th{position:static}
+    canvas{max-height:260px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr}
+  }
 </style>
 </head>
 <body>
@@ -109,6 +123,8 @@
     <button data-p="log" id="navLog" style="display:none">로그</button>
   </nav>
   <div class="spacer"></div>
+  <button class="btn sec sm" onclick="exportReport('html')" title="지금 보고 있는 대시보드 화면을 HTML 파일로 저장">HTML 보고서</button>
+  <button class="btn sec sm" onclick="exportReport('pdf')" title="지금 보고 있는 대시보드 화면을 PDF로 저장 (인쇄 대화상자에서 'PDF로 저장')">PDF 보고서</button>
   <span id="who" class="muted"></span>
   <button class="btn sec sm" onclick="logout()">로그아웃</button>
 </div></header>
@@ -116,7 +132,8 @@
 <main>
 <!-- ================= 대시보드 ================= -->
 <section class="page on" id="p-dash">
-  <div class="card">
+  <div class="rpt-head card" id="rptHead"></div>
+  <div class="card" id="filterCard">
     <div class="row">
       <div><label>시작일</label><input type="date" id="fFrom"></div>
       <div><label>종료일</label><input type="date" id="fTo"></div>
@@ -1014,6 +1031,51 @@ async function loadAdmins(){
 }
 async function addAdmin(){ const e=$('#adminEmail').value.trim().toLowerCase(); if(!e) return; const {error}=await sb.from('admin_users').insert({email:e, added_by:user.email}); if(error) return toast(sqlErr(error)); $('#adminEmail').value=''; toast('추가됨'); loadAdmins(); }
 async function delAdmin(e){ if(!confirm(e+' 의 관리자 권한을 제거할까요?')) return; const {error}=await sb.from('admin_users').delete().eq('email',e); if(error) return toast(sqlErr(error)); loadAdmins(); }
+
+/* ============================ 보고서 내보내기 ============================ */
+function reportMeta(){
+  const f=DASH.f||filters(); const types=f.types.join(', '); const brands=f.brands&&f.brands.length? f.brands.join(', ') : '전체';
+  const trend=document.querySelector('#fGrain input:checked')?.value; const tsel=typeof trendSel==='function'? trendSel() : null; const lsel=typeof leadSel==='function'? leadSel() : null;
+  return { title:'마케팅 퍼포먼스 보고서', period:`${f.from} ~ ${f.to}`, basis: f.basis==='inquiry'?'문의일자':'계약일자', brands, dedup:f.dbLabel, types,
+           trend:{month:'월별',week:'주별',day:'일별',year:'연별'}[trend]||trend, trendBrands: tsel? tsel.join(', ') : '전체', leadBrands: lsel? lsel.join(', ') : '전체',
+           at: kst(new Date().toISOString()), by: user?.email||'' };
+}
+function reportHeadHtml(m){
+  return `<h1 style="font-size:18px;margin:0 0 4px">${esc(m.title)}</h1>
+  <div class="muted">기간 <b>${esc(m.period)}</b> · 매출 기준일 <b>${esc(m.basis)}</b> · 브랜드 <b>${esc(m.brands)}</b> · 중복 제외 <b>${esc(m.dedup)}</b> · 매체유형 <b>${esc(m.types)}</b><br>
+  기간별 추이 <b>${esc(m.trend)}</b>(브랜드 ${esc(m.trendBrands)}) · 리드타임 브랜드 <b>${esc(m.leadBrands)}</b> · 생성 ${esc(m.at)} · ${esc(m.by)}</div>`;
+}
+async function exportReport(kind){
+  if(!DASH.f){ return toast('먼저 대시보드를 조회하세요'); }
+  const m=reportMeta(); $('#rptHead').innerHTML=reportHeadHtml(m);
+  if(kind==='pdf'){ // 브라우저 인쇄 → "PDF로 저장"
+    const prev=document.title; document.title=`${m.title}_${m.period.replace(/ /g,'')}`;
+    toast('인쇄 창에서 대상(프린터)을 "PDF로 저장"으로 선택하세요', 5000);
+    setTimeout(()=>{ window.print(); setTimeout(()=>{ document.title=prev; }, 1000); }, 300);
+    return;
+  }
+  // HTML: 현재 화면을 그대로 담은 단독 파일 (차트는 이미지로 변환)
+  loading(true,'HTML 보고서 만드는 중…',50);
+  try{
+    const sec=$('#p-dash').cloneNode(true);
+    // 차트 캔버스 → 이미지
+    const live=[...$('#p-dash').querySelectorAll('canvas')], cl=[...sec.querySelectorAll('canvas')];
+    cl.forEach((c,i)=>{ const img=document.createElement('img'); try{ img.src=live[i].toDataURL('image/png'); }catch(e){} img.style.maxWidth='100%'; img.style.height='auto'; c.replaceWith(img); });
+    // 필터·컨트롤 제거, 표 스크롤 해제
+    sec.querySelector('#filterCard')?.remove();
+    sec.querySelectorAll('.ms, #fGrain, #fLeadGrain, #trendMsg, #leadMsg, button').forEach(e=>e.remove());
+    sec.querySelectorAll('.tw').forEach(e=>{ e.style.maxHeight='none'; e.style.overflow='visible'; });
+    sec.querySelector('#rptHead').style.display='block';
+    const css=[...document.querySelectorAll('style')].map(x=>x.textContent).join('\n');
+    const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(m.title)} ${esc(m.period)}</title><style>${css}
+      header,#login,#loading{display:none} main{max-width:1400px;margin:0 auto;padding:16px} .rpt-head{display:block} th{position:static}</style></head>
+      <body><main>${sec.outerHTML}</main><div class="muted" style="text-align:center;padding:12px">마케팅 퍼포먼스 DB · 생성 ${esc(m.at)} · 이 파일은 생성 시점의 화면을 그대로 담은 정적 보고서입니다</div></body></html>`;
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'})); a.download=`${m.title}_${m.period.replace(/ /g,'')}.html`; a.click();
+    toast('HTML 보고서 저장됨');
+  }catch(e){ toast('실패: '+sqlErr(e),6000); }
+  finally{ loading(false); }
+}
+window.addEventListener('afterprint', ()=>{ /* 머리글은 화면에서는 숨김 유지 */ });
 
 /* ============================ 설정 ============================ */
 async function refreshAgg(){ loading(true,'IP 이관 확인 중…',10); try{ let m=await rpc('fn_ip_migrate',{p_n:10000}); let n=1; while((m.ip_pending||0)>0){ loading(true,`IP 이관 남은 ${fmt(m.ip_pending)}행 … (${n++}회차)`,50); m=await rpc('fn_ip_migrate',{p_n:10000}); } loading(true,'집계 갱신 중…',80); const r=await rpc('fn_refresh_agg',{}); toast(`집계 갱신 완료 (${fmt(r.media_rows)}행)`); showStatus(); }catch(e){ toast('실패: '+sqlErr(e),6000); } finally{ loading(false); } }
