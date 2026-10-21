@@ -100,6 +100,7 @@
     <button data-p="map">매핑</button>
     <button data-p="down">다운로드</button>
     <button data-p="set">설정</button>
+    <button data-p="log" id="navLog" style="display:none">로그</button>
   </nav>
   <div class="spacer"></div>
   <span id="who" class="muted"></span>
@@ -114,7 +115,6 @@
       <div><label>시작일</label><input type="date" id="fFrom"></div>
       <div><label>종료일</label><input type="date" id="fTo"></div>
       <div><label>매출 기준일</label><select id="fBasis"><option value="contract">계약일자</option><option value="inquiry">문의일자</option></select></div>
-      <div><label>추이 단위</label><select id="fGrain"><option value="day">일</option><option value="week" selected>주</option><option value="month">월</option><option value="year">연</option></select></div>
       <div><label>중복 제외</label><div class="chk" id="fDedup">
         <label title="CRM이 중복여부=Y로 표시한 문의 제외"><input type="checkbox" id="fDupCrm" checked>CRM 중복(중복여부=Y)</label>
         <label title="같은 IP로 7일 내 재문의 제외 (IP는 해시로만 저장)"><input type="checkbox" id="fDupIp">IP 중복(7일)</label></div></div>
@@ -131,7 +131,13 @@
   <div class="kpis" id="kpis"></div>
 
   <div class="card" style="margin-top:14px">
-    <h2>기간별 추이</h2>
+    <div class="row" style="align-items:center;margin-bottom:6px"><h2 style="margin:0">기간별 추이</h2>
+      <div class="chk" id="fGrain" style="margin-left:12px">
+        <label><input type="radio" name="grain" value="month" checked>월별</label>
+        <label><input type="radio" name="grain" value="week">주별</label>
+        <label><input type="radio" name="grain" value="day">일별</label>
+        <label><input type="radio" name="grain" value="year">연별</label></div>
+      <span class="muted" id="trendMsg"></span></div>
     <canvas id="chTrend"></canvas>
     <div class="tw" style="margin-top:10px"><table id="tTrend"></table></div>
   </div>
@@ -300,8 +306,33 @@
     <div id="setStatus" class="pre">-</div>
   </div>
 </section>
+<!-- ================= 로그 (관리자) ================= -->
+<section class="page" id="p-log">
+  <div class="card">
+    <h2>활동 로그 <span class="muted">(관리자 전용 · 로그인/로그아웃/업로드/데이터 변경 이력)</span></h2>
+    <div class="row">
+      <div><label>시작일</label><input type="date" id="lgFrom"></div>
+      <div><label>종료일</label><input type="date" id="lgTo"></div>
+      <div><label>계정(이메일)</label><input id="lgActor" placeholder="일부 입력 가능"></div>
+      <div><label>동작</label><select id="lgAction"><option value="">전체</option><option value="login">로그인</option><option value="logout">로그아웃</option><option value="password_change">비밀번호 변경</option><option value="upload">업로드</option><option value="batch_toggle">배치 활성/비활성</option><option value="update">데이터 수정</option><option value="insert">데이터 기입</option><option value="delete">데이터 삭제</option><option value="agg_refresh">집계 갱신</option></select></div>
+      <div><label>최대 건수</label><select id="lgLimit"><option>500</option><option>2000</option><option>5000</option></select></div>
+      <div><button class="btn" onclick="loadLog()">조회</button></div>
+      <div><button class="btn sec" onclick="dlLog()">CSV 다운로드</button></div>
+      <div class="muted" id="lgMsg"></div>
+    </div>
+    <div class="tw" style="margin-top:10px;max-height:620px"><table id="tLog"></table></div>
+  </div>
+  <div class="card">
+    <h2>관리자 계정 <span class="muted">(여기 등록된 이메일만 로그 메뉴가 보입니다)</span></h2>
+    <div class="row"><div><label>이메일 추가</label><input id="adminEmail" type="email" style="width:260px"></div><div><button class="btn" onclick="addAdmin()">추가</button></div></div>
+    <div class="tw" style="margin-top:10px"><table id="tAdmins"></table></div>
+  </div>
+</section>
 </main>
 <div class="toast" id="toast"></div>
+<div id="loading" style="display:none;position:fixed;inset:0;background:rgba(245,246,248,.75);z-index:150;align-items:center;justify-content:center">
+  <div class="card" style="min-width:320px;text-align:center"><div style="font-weight:700;margin-bottom:6px" id="loadingTitle">불러오는 중…</div><div class="muted" id="loadingStep"></div><div class="prog" style="margin-top:10px"><div id="loadingBar" style="width:30%;transition:width .4s"></div></div><div class="muted" style="margin-top:6px"><span id="loadingSec">0</span>초 경과</div></div>
+</div>
 
 <script>
 /* ============================ 공통 ============================ */
@@ -313,10 +344,13 @@ const pct = (a,b) => b ? fmt(100*a/b,1)+'%' : '-';
 const div = (a,b,d=1) => b ? fmt(a/b,d) : '-';
 const kst = t => { if(!t) return ''; const d=new Date(t); return isNaN(d)? String(t).slice(0,16) : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
 const esc = s => String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let _ldT=null, _ldStart=0;
+function loading(on, step, pctv){ const el=$('#loading'); if(on){ if(el.style.display!=='flex'){ el.style.display='flex'; _ldStart=Date.now(); clearInterval(_ldT); _ldT=setInterval(()=>{ $('#loadingSec').textContent=((Date.now()-_ldStart)/1000).toFixed(0); },500); } if(step) $('#loadingStep').textContent=step; if(pctv!=null) $('#loadingBar').style.width=pctv+'%'; } else { el.style.display='none'; clearInterval(_ldT); } }
 function toast(m, ms=2500){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'), ms); }
 function getCfg(){ const m=String(SUPABASE_URL||'').trim().match(/^(https:\/\/[a-z0-9-]+\.supabase\.(co|in))/); const key=String(SUPABASE_ANON_KEY||'').trim(); return (m&&key)?{url:m[1],key}:null; }
 const SITE_URL = location.origin + location.pathname;   // 비밀번호 재설정 메일이 돌아올 주소
 function sqlErr(e){ console.error(e); return (e&&(e.message||e.error_description||e.hint))||String(e); }
+async function logEvent(action, target, detail){ try{ await sb.from('activity_log').insert({action, target:target||null, detail:detail||null}); }catch(e){} }
 async function rpc(fn, args){ const {data,error}=await sb.rpc(fn,args); if(error) throw error; return data; }
 async function selectAll(table, build){ // 1000행 제한 우회 페이지네이션
   let out=[], from=0; const step=1000;
@@ -345,6 +379,7 @@ async function login(){
   $('#loginMsg').textContent='로그인 중…';
   const {data,error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(), password:$('#pw').value});
   if(error){ $('#loginMsg').textContent='로그인 실패: '+(/Invalid login credentials/i.test(error.message)?'이메일 또는 비밀번호가 올바르지 않습니다':sqlErr(error)); return; }
+  await logEvent('login','auth',{ua:navigator.userAgent.slice(0,120)});
   afterLogin(data.user);
 }
 async function forgotPw(){
@@ -358,20 +393,22 @@ async function setNewPw(){
   if(p1.length<8) return $('#recoverMsg').textContent='8자 이상 입력하세요'; if(p1!==p2) return $('#recoverMsg').textContent='두 비밀번호가 다릅니다';
   const {data,error}=await sb.auth.updateUser({password:p1});
   if(error) return $('#recoverMsg').textContent='실패: '+sqlErr(error)+' (링크가 만료되었으면 로그인 화면에서 다시 "비밀번호 찾기")';
-  history.replaceState(null,'',location.pathname); recovering=false; $('#recoverBox').style.display='none'; $('#loginBox').style.display='block'; toast('비밀번호가 변경되었습니다'); afterLogin(data.user);
+  history.replaceState(null,'',location.pathname); recovering=false; $('#recoverBox').style.display='none'; $('#loginBox').style.display='block'; toast('비밀번호가 변경되었습니다'); await logEvent('password_change','auth',{via:'recovery'}); afterLogin(data.user);
 }
 async function changePw(){
   const p1=$('#cpw1').value, p2=$('#cpw2').value;
   if(p1.length<8) return toast('8자 이상 입력하세요'); if(p1!==p2) return toast('두 비밀번호가 다릅니다');
   const {error}=await sb.auth.updateUser({password:p1}); if(error) return toast('실패: '+sqlErr(error));
-  $('#cpw1').value=''; $('#cpw2').value=''; toast('비밀번호가 변경되었습니다');
+  await logEvent('password_change','auth'); $('#cpw1').value=''; $('#cpw2').value=''; toast('비밀번호가 변경되었습니다');
 }
-async function logout(){ await sb.auth.signOut(); }
+async function logout(){ await logEvent('logout','auth'); await sb.auth.signOut(); }
 function afterLogin(u){
   user=u; $('#who').textContent=u.email; $('#setEmail').textContent=u.email; $('#login').style.display='none';
   const today=new Date(); const y=today.getFullYear();
   $('#fFrom').value=`${y}-01-01`; $('#fTo').value=today.toISOString().slice(0,10);
   $('#spDate').value=today.toISOString().slice(0,10); $('#spMonth').value=today.toISOString().slice(0,7);
+  const t2=new Date(); t2.setDate(t2.getDate()-30); $('#lgFrom').value=t2.toISOString().slice(0,10); $('#lgTo').value=today.toISOString().slice(0,10);
+  sb.from('admin_users').select('email').eq('email',u.email).then(({data})=>{ if(data&&data.length){ $('#navLog').style.display=''; } });
   loadDash(); loadBatches(); loadMediaStdList();
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
@@ -381,6 +418,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   if(b.dataset.p==='spend'){ loadSpend(); loadMediaStdList(); }
   if(b.dataset.p==='set'){ showStatus(); }
   if(b.dataset.p==='upload'){ loadBatches(); }
+  if(b.dataset.p==='log'){ loadLog(); loadAdmins(); }
 });
 $('#upKind').onchange=()=>{ $('#piiBox').style.display = $('#upKind').value==='inquiry'?'':'none'; $('#upGo').disabled=true; $('#upPreview').innerHTML=''; };
 
@@ -390,18 +428,18 @@ function filters(){
   const crm=$('#fDupCrm').checked, ip=$('#fDupIp').checked;
   const dbField = crm&&ip ? 'both_db' : crm ? 'net_db' : ip ? 'ip_db' : 'db_count';
   const dbLabel = crm&&ip ? 'CRM+IP 중복 제외' : crm ? 'CRM 중복 제외' : ip ? 'IP 중복 제외' : '전체';
-  return { from:$('#fFrom').value, to:$('#fTo').value, basis:$('#fBasis').value, grain:$('#fGrain').value, dbField, dbLabel, dedup:(crm||ip), types };
+  return { from:$('#fFrom').value, to:$('#fTo').value, basis:$('#fBasis').value, grain:document.querySelector('#fGrain input:checked').value, dbField, dbLabel, dedup:(crm||ip), types };
 }
 const charts={};
 function chart(id, cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart($('#'+id), cfg); }
 function sumRows(rows, f){
-  const s={db:0,net:0,ipdb:0,both:0,contracts:0,revenue:0,margin:0,cost:0,impressions:0,clicks:0};
-  rows.forEach(r=>{ s.db+=r.db_count; s.net+=r.net_db; s.ipdb+=(r.ip_db||0); s.both+=(r.both_db||0); s.contracts+=r.contracts; s.revenue+=+r.revenue; s.margin+=+r.margin; s.cost+=+r.cost; s.impressions+=+r.impressions; s.clicks+=+r.clicks; });
+  const s={db:0,net:0,ipdb:0,both:0,contracts:0,revenue:0,carprice:0,cost:0,impressions:0,clicks:0};
+  rows.forEach(r=>{ s.db+=r.db_count; s.net+=r.net_db; s.ipdb+=(r.ip_db||0); s.both+=(r.both_db||0); s.contracts+=r.contracts; s.revenue+=+r.revenue; s.carprice+=+(r.car_price_sum||0); s.cost+=+(r.cost||0); s.impressions+=+(r.impressions||0); s.clicks+=+(r.clicks||0); });
   s.dbSel = f.dbField==='both_db'? s.both : f.dbField==='net_db'? s.net : f.dbField==='ip_db'? s.ipdb : s.db; return s;
 }
 // 열: DB(전체) | DB(제외후) | 계약 | 매출 | 마진 | 광고비 | ROAS | CPA(DB) | CPA(계약) | 전환율   ※ CPA·전환율은 제외후 DB 기준
-function metricCols(s){ return [fmt(s.db), fmt(s.dbSel), fmt(s.contracts), won(s.revenue), won(s.margin), won(s.cost), div(s.revenue,s.cost,1), s.cost?won(s.cost/(s.dbSel||NaN)):'-', s.cost?won(s.cost/(s.contracts||NaN)):'-', pct(s.contracts,s.dbSel)]; }
-const METRIC_H = ['DB(전체)','DB(제외후)','계약수','매출','마진','광고비','ROAS','CPA(DB)','CPA(계약)','전환율'];
+function metricCols(s){ return [fmt(s.db), fmt(s.dbSel), fmt(s.contracts), won(s.revenue), won(s.carprice), won(s.cost), div(s.revenue,s.cost,1), s.cost?won(s.cost/(s.dbSel||NaN)):'-', s.cost?won(s.cost/(s.contracts||NaN)):'-', pct(s.contracts,s.dbSel)]; }
+const METRIC_H = ['DB(전체)','DB(제외후)','계약수','매출(계약마진)','차량가 합계','광고비','ROAS','CPA(DB)','CPA(계약)','전환율'];
 function groupBy(rows, keyFn){ const m=new Map(); rows.forEach(r=>{ const k=keyFn(r)??'(없음)'; if(!m.has(k)) m.set(k,[]); m.get(k).push(r); }); return m; }
 function renderTable(id, headers, rows, opts={}){
   const t=$('#'+id); const leftCols=opts.left||[0];
@@ -417,30 +455,45 @@ function renderTable(id, headers, rows, opts={}){
     trs.forEach(tr=>tb.appendChild(tr));
   });
 }
+function renderTrend(Pf, f, s){
+    const byP=groupBy(Pf, r=>r.period); const periods=[...byP.keys()].sort();
+  const plabel = p => { if(f.grain==='month') return p.slice(0,7); if(f.grain==='year') return p.slice(0,4);
+    if(f.grain==='week'){ const d=new Date(p+'T00:00:00'); const e=new Date(d); e.setDate(d.getDate()+6); const md=x=>`${x.getMonth()+1}/${x.getDate()}`; return `${md(d)}~${md(e)} 주`; } return p; };
+  const tr = periods.map(p=>{ const x=sumRows(byP.get(p),f); return {p, label:plabel(p), ...x}; });
+  renderTable('tTrend', ['기간',...METRIC_H], tr.map(x=>[x.label, ...metricCols(x)]), {foot:['합계',...metricCols(s)]});
+  chart('chTrend',{data:{labels:tr.map(x=>x.label), datasets:[
+    {type:'bar',label:'DB(전체)',data:tr.map(x=>x.db),backgroundColor:'rgba(37,99,235,.18)',yAxisID:'y'},
+    {type:'bar',label:'DB('+f.dbLabel+')',data:tr.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.55)',yAxisID:'y'},
+    {type:'bar',label:'계약수',data:tr.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.6)',yAxisID:'y'},
+    {type:'line',label:'광고비',data:tr.map(x=>x.cost),borderColor:'#f59e0b',backgroundColor:'#f59e0b',yAxisID:'y2',tension:.2},
+    {type:'line',label:'매출(계약마진)',data:tr.map(x=>x.revenue),borderColor:'#8b5cf6',backgroundColor:'#8b5cf6',yAxisID:'y2',tension:.2}]},
+    options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{callback:v=>won(v)}}}}});
+
+}
+// 추이 단위 라디오 변경 → 추이만 다시 조회 (서버 1회, 경량)
+document.querySelectorAll('#fGrain input').forEach(r=>r.onchange=async()=>{
+  if(!DASH.f) return loadDash();
+  const f={...DASH.f, grain:r.value}; $('#trendMsg').textContent='조회 중…';
+  try{ const P=await rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:f.basis});
+    const Pf=P.filter(x=>f.types.includes(x.media_type)); DASH.f=f; DASH.P=Pf; renderTrend(Pf, f, sumRows(DASH.M,f)); $('#trendMsg').textContent=''; }
+  catch(e){ $('#trendMsg').textContent='실패: '+sqlErr(e); }
+});
 async function loadDash(){
   const f=filters(); if(!f.from||!f.to) return toast('기간을 선택하세요');
-  $('#status').textContent='조회 중…';
+  $('#status').innerHTML='<span class="pill">조회 중…</span>'; const btn=document.querySelector('#p-dash button.btn'); btn.disabled=true;
+  loading(true, `${f.from} ~ ${f.to} 집계 조회 중 (서버 1회 호출)`, 25);
   try{
-    const st = await rpc('fn_data_status',{});
-    if(st.inquiries>0 && !(st.agg_rows>0)){ $('#status').innerHTML='<span class="pill warn">집계 테이블이 비어 있습니다</span> 집계 갱신 중… (최초 1회, 10~30초)'; await rpc('fn_refresh_agg',{}); }
-    const [P, M, C] = await Promise.all([
-      rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:f.basis}),
-      rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:'all',p_basis:f.basis}),
-      rpc('fn_car_summary',{p_from:f.from,p_to:f.to,p_basis:f.basis})]);
-    const [L0, LM, LC, LB, LD, LMB, LPL] = await Promise.all([
-      rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'all'}),
-      rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'media'}),
-      rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'car'}),
-      rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'car_brand'}),
-      rpc('fn_leadtime_dist',{p_from:f.from,p_to:f.to,p_basis:f.basis}),
-      rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'media_brand'}),
-      rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'platform'}),
-    ]);
+    const t0=Date.now();
+    let D = await rpc('fn_dashboard',{p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:f.basis});
+    if(D.status.inquiries>0 && !(D.status.agg_rows>0)){ loading(true,'집계 테이블이 비어 있어 갱신 중… (최초 1회, 10~60초)',50); await rpc('fn_refresh_agg',{}); loading(true,'다시 조회 중…',75); D = await rpc('fn_dashboard',{p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:f.basis}); }
+    loading(true,'화면 그리는 중…',90);
+    const {status:st, P, M, C, L0, LM, LC, LB, LD, LMB, LPL} = D;
+    const took=((Date.now()-t0)/1000).toFixed(1);
     const inc = r => f.types.includes(r.media_type);
     const Pf=P.filter(inc), Mf=M.filter(inc);
     DASH={f, P:Pf, M:Mf, C, L0, LM, LC, LB, LD, LMB, LPL};
     const unc = M.filter(r=>r.media_type==='미분류').length;
-    $('#status').innerHTML = `유입 ${fmt(st.inquiries)}건 (${(st.inquiry_min||'').slice(0,10)} ~ ${(st.inquiry_max||'').slice(0,10)}) · 활성 매출 ${fmt(st.sales_active)}건 (계약일 ${st.contract_min||'-'} ~ ${st.contract_max||'-'}) · 광고비 입력 ${fmt(st.ad_spend_days)}일 (최근 ${st.ad_spend_max||'-'})`
+    $('#status').innerHTML = `<span class="pill ok">조회 완료 ${took}초</span> 유입 ${fmt(st.inquiries)}건 (${(st.inquiry_min||'').slice(0,10)} ~ ${(st.inquiry_max||'').slice(0,10)}) · 활성 매출 ${fmt(st.sales_active)}건 (계약일 ${st.contract_min||'-'} ~ ${st.contract_max||'-'}) · 광고비 입력 ${fmt(st.ad_spend_days)}일 (최근 ${st.ad_spend_max||'-'})`
       + (st.sales_unmatched? ` · <span class="pill warn">미매칭 매출 ${fmt(st.sales_unmatched)}건 (유입 매체에 없음, 집계 제외)</span>`:'')
       + (st.media_unclassified? ` · <span class="pill warn">미분류 매체 ${fmt(st.media_unclassified)}종</span>`:'')
       + (st.car_unmapped? ` · <span class="pill">브랜드 미지정 차량명 ${fmt(st.car_unmapped)}종</span>`:'')
@@ -453,28 +506,16 @@ async function loadDash(){
       ['DB수 (전체)', fmt(s.db), `CRM중복 ${fmt(s.db-s.net)} · IP중복 ${fmt(s.db-s.ipdb)}`],
       ['DB수 ('+f.dbLabel+')', fmt(s.dbSel), f.dedup?`제외 ${fmt(s.db-s.dbSel)}건 (${pct(s.db-s.dbSel,s.db)})`:'중복 제외 안 함'],
       ['계약수', fmt(s.contracts), `전환율 ${pct(s.contracts,s.dbSel)}`],
-      ['매출(차량가격)', won(s.revenue), `건당 ${won(s.contracts? s.revenue/s.contracts:null)}`],
-      ['계약마진', won(s.margin), `마진율 ${pct(s.margin,s.revenue)}`],
+      ['매출 (계약마진 합)', won(s.revenue), `건당 ${won(s.contracts? s.revenue/s.contracts:null)}`],
+      ['차량가 합계', won(s.carprice), `차량가 대비 매출 ${pct(s.revenue,s.carprice)}`],
       ['광고비', won(s.cost), s.cost?`노출 ${fmt(s.impressions)} · 클릭 ${fmt(s.clicks)}`:'광고비 미입력'],
-      ['ROAS', s.cost? fmt(s.revenue/s.cost,1)+'x' : '-', s.cost? `마진 ROAS ${fmt(s.margin/s.cost,2)}x`:'광고비 입력 필요'],
+      ['ROAS', s.cost? fmt(s.revenue/s.cost,2)+'x' : '-', s.cost? '매출(계약마진) ÷ 광고비':'광고비 입력 필요'],
       ['CPA (DB당)', s.cost&&s.dbSel? fmt(s.cost/s.dbSel)+'원':'-', ''],
       ['CPA (계약당)', s.cost&&s.contracts? fmt(s.cost/s.contracts)+'원':'-', ''],
       ['리드타임 중앙값', lt.median_days!=null? fmt(lt.median_days,1)+'일':'-', lt.n? `평균 ${fmt(lt.avg_days,1)}일 · n=${fmt(lt.n)}`:''],
     ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
 
-    // 추이
-    const byP=groupBy(Pf, r=>r.period); const periods=[...byP.keys()].sort();
-    const plabel = p => { if(f.grain==='month') return p.slice(0,7); if(f.grain==='year') return p.slice(0,4);
-      if(f.grain==='week'){ const d=new Date(p+'T00:00:00'); const e=new Date(d); e.setDate(d.getDate()+6); const md=x=>`${x.getMonth()+1}/${x.getDate()}`; return `${md(d)}~${md(e)} 주`; } return p; };
-    const tr = periods.map(p=>{ const x=sumRows(byP.get(p),f); return {p, label:plabel(p), ...x}; });
-    renderTable('tTrend', ['기간',...METRIC_H], tr.map(x=>[x.label, ...metricCols(x)]), {foot:['합계',...metricCols(s)]});
-    chart('chTrend',{data:{labels:tr.map(x=>x.label), datasets:[
-      {type:'bar',label:'DB(전체)',data:tr.map(x=>x.db),backgroundColor:'rgba(37,99,235,.18)',yAxisID:'y'},
-      {type:'bar',label:'DB('+f.dbLabel+')',data:tr.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.55)',yAxisID:'y'},
-      {type:'bar',label:'계약수',data:tr.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.6)',yAxisID:'y'},
-      {type:'line',label:'광고비',data:tr.map(x=>x.cost),borderColor:'#f59e0b',backgroundColor:'#f59e0b',yAxisID:'y2',tension:.2},
-      {type:'line',label:'매출',data:tr.map(x=>x.revenue),borderColor:'#8b5cf6',backgroundColor:'#8b5cf6',yAxisID:'y2',tension:.2}]},
-      options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{callback:v=>won(v)}}}}});
+    renderTrend(Pf, f, s);
 
     // 매체별
     const ltByMedia=new Map(LM.map(x=>[x.dim_value,x]));
@@ -492,9 +533,9 @@ async function loadDash(){
     // 차량
     const cars=C.map(r=>({...r, dbSel: r[f.dbField]??r.db_count}));
     const ci=[...cars].sort((a,b)=>b.dbSel-a.dbSel).slice(0,15), cs=[...cars].sort((a,b)=>b.contracts-a.contracts).slice(0,15);
-    const carRow = x => [esc(x.model_std||'(없음)'), esc(x.car_brand??''), fmt(x.db_count), fmt(x.dbSel), fmt(x.contracts), pct(x.contracts,x.dbSel), won(x.revenue)];
-    renderTable('tCarInq', ['차량','브랜드','DB(전체)','DB(제외후)','계약','전환율','매출'], ci.map(carRow), {left:[0,1]});
-    renderTable('tCarSale', ['차량','브랜드','DB(전체)','DB(제외후)','계약','전환율','매출'], cs.map(carRow), {left:[0,1]});
+    const carRow = x => [esc(x.model_std||'(없음)'), esc(x.car_brand??''), fmt(x.db_count), fmt(x.dbSel), fmt(x.contracts), pct(x.contracts,x.dbSel), won(x.revenue), won(x.car_price_sum)];
+    renderTable('tCarInq', ['차량','브랜드','DB(전체)','DB(제외후)','계약','전환율','매출(계약마진)','차량가 합계'], ci.map(carRow), {left:[0,1]});
+    renderTable('tCarSale', ['차량','브랜드','DB(전체)','DB(제외후)','계약','전환율','매출(계약마진)','차량가 합계'], cs.map(carRow), {left:[0,1]});
     const cc=[...cars].filter(x=>x.model_std&&x.model_std!=='-').sort((a,b)=>b.contracts-a.contracts).slice(0,12);
     chart('chCar',{type:'bar',data:{labels:cc.map(x=>x.model_std),datasets:[{label:'문의(DB)',data:cc.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.5)',yAxisID:'y'},{label:'계약',data:cc.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.9)',yAxisID:'y2'}]},options:{scales:{y:{beginAtZero:true,position:'left'},y2:{beginAtZero:true,position:'right',grid:{drawOnChartArea:false}}}}});
 
@@ -510,6 +551,7 @@ async function loadDash(){
     renderTable('tLeadMedia', LTH, LM.filter(x=>x.n>=5).map(ltRow));
     renderTable('tLeadCar', LTH, LC.filter(x=>x.n>=5).map(ltRow));
   }catch(e){ $('#status').innerHTML='<span class="pill bad">오류</span> '+esc(sqlErr(e)); }
+  finally{ loading(false); btn.disabled=false; }
 }
 
 /* ============================ 업로드 ============================ */
@@ -542,7 +584,9 @@ async function parseUpload(){
   const file=$('#upFile').files[0]; if(!file) return toast('파일을 선택하세요');
   const kind=$('#upKind').value; $('#upMsg').textContent='파일 읽는 중…'; $('#upGo').disabled=true; $('#upPreview').innerHTML='';
   try{
+    loading(true,'파일 읽는 중… (큰 파일은 30초 이상)',20);
     const rows=await readSheet(file); if(rows.length<2) throw new Error('데이터 행이 없습니다');
+    loading(true,'검증·변환 중…',60);
     const header=rows[0].map(h=>str(h)); const MAP = kind==='inquiry'? INQ_MAP : SALE_MAP;
     const required = kind==='inquiry'? ['문의번호','문의일시','광고매체'] : ['유입매체','문의일자','계약일자','차량가격'];
     const missing=required.filter(h=>!header.includes(h)); if(missing.length) throw new Error('필수 컬럼이 없습니다: '+missing.join(', ')+'\n파일 헤더: '+header.join(' | '));
@@ -582,11 +626,12 @@ async function parseUpload(){
     $('#upMsg').innerHTML=msg;
     const prev=out.slice(0,8); const cols=Object.keys(prev[0]||{}).filter(c=>!['raw','consents','ip_raw'].includes(c));
     $('#upPreview').innerHTML='<div class="tw"><table><thead><tr>'+cols.map(c=>`<th class="l">${c}</th>`).join('')+'</tr></thead><tbody>'+prev.map(o=>'<tr>'+cols.map(c=>`<td class="l">${esc(o[c])}</td>`).join('')+'</tr>').join('')+'</tbody></table></div>';
-    $('#upGo').disabled=false;
-  }catch(e){ $('#upMsg').innerHTML='<span class="pill bad">검증 실패</span> '+esc(sqlErr(e)).replace(/\n/g,'<br>'); }
+    $('#upGo').disabled=false; loading(false);
+  }catch(e){ loading(false); $('#upMsg').innerHTML='<span class="pill bad">검증 실패</span> '+esc(sqlErr(e)).replace(/\n/g,'<br>'); }
 }
 async function doUpload(){
   if(!UP) return; const {kind,rows,file,hash}=UP; $('#upGo').disabled=true; const bar=$('#upBar'); bar.style.width='0%';
+  loading(true, `업로드 준비 중… (${fmt(rows.length)}행)`, 2);
   try{
     const {data:b,error:be}=await sb.from('upload_batches').insert({kind, filename:file.name, file_hash:hash, note:$('#upNote').value||null, uploaded_by:user.email}).select().single(); if(be) throw be;
     const CH=500; let done=0;
@@ -594,13 +639,13 @@ async function doUpload(){
       const chunk=rows.slice(i,i+CH).map(o=>({...o, batch_id:b.id}));
       const q = kind==='inquiry' ? sb.from('inquiries').upsert(chunk,{onConflict:'inquiry_no'}) : sb.from('sales').insert(chunk);
       const {error}=await q; if(error) throw new Error(`행 ${i+2}~${i+1+chunk.length} 저장 실패: `+sqlErr(error));
-      done+=chunk.length; bar.style.width=(100*done/rows.length).toFixed(1)+'%'; $('#upMsg').textContent=`업로드 중… ${fmt(done)} / ${fmt(rows.length)}`;
+      done+=chunk.length; bar.style.width=(100*done/rows.length).toFixed(1)+'%'; $('#upMsg').textContent=`업로드 중… ${fmt(done)} / ${fmt(rows.length)}`; loading(true, `업로드 중… ${fmt(done)} / ${fmt(rows.length)}행`, Math.round(95*done/rows.length));
     }
     await sb.from('upload_batches').update({row_count:done}).eq('id',b.id);
     $('#upMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(done)}행 저장 (배치 #${b.id}) · 집계 갱신 중…`;
-    if(kind==='inquiry'){ try{ await rpc('fn_refresh_agg',{}); }catch(e){ toast('집계 갱신 실패: '+sqlErr(e)+' — 설정 탭에서 [집계 갱신]을 다시 눌러주세요', 6000); } }
-    $('#upMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(done)}행 저장 (배치 #${b.id})`; toast('업로드 완료'); UP=null; $('#upFile').value=''; loadBatches();
-  }catch(e){ $('#upMsg').innerHTML='<span class="pill bad">업로드 중단</span> '+esc(sqlErr(e))+' — 이미 저장된 행은 유지됩니다. 같은 파일을 다시 검증·업로드하면 유입은 갱신, 매출은 새 배치로 들어가므로 실패한 배치는 비활성화하세요.'; $('#upGo').disabled=false; }
+    if(kind==='inquiry'){ loading(true,'집계·IP 중복 갱신 중… (10~60초)',97); try{ await rpc('fn_refresh_agg',{}); }catch(e){ toast('집계 갱신 실패: '+sqlErr(e)+' — 설정 탭에서 [집계 갱신]을 다시 눌러주세요', 6000); } }
+    $('#upMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(done)}행 저장 (배치 #${b.id})`; toast('업로드 완료'); UP=null; $('#upFile').value=''; loadBatches(); loading(false);
+  }catch(e){ loading(false); $('#upMsg').innerHTML='<span class="pill bad">업로드 중단</span> '+esc(sqlErr(e))+' — 이미 저장된 행은 유지됩니다. 같은 파일을 다시 검증·업로드하면 유입은 갱신, 매출은 새 배치로 들어가므로 실패한 배치는 비활성화하세요.'; $('#upGo').disabled=false; }
 }
 async function loadBatches(){
   try{
@@ -710,7 +755,7 @@ async function dl(kind){
     const f=DASH.f||filters(); const tag=`${f.from}_${f.to}`; const rate=r=>{ const d=r[f.dbField]??r.db_count; return {...r, db_selected:d, dedup_rule:f.dbLabel, roas:r.cost?+(r.revenue/r.cost).toFixed(2):null, cpa_db:r.cost&&d?Math.round(r.cost/d):null, cpa_contract:r.cost&&r.contracts?Math.round(r.cost/r.contracts):null, conv_rate:d?+(100*r.contracts/d).toFixed(2):null}; };
     if(kind==='media_period'){ if(!DASH.P) await loadDash(); csvDownload(`매체x기간_${f.grain}_${tag}.csv`, objsToRows(DASH.P.map(rate))); }
     else if(kind==='media_total'){ if(!DASH.M) await loadDash(); csvDownload(`매체별합계_${tag}.csv`, objsToRows(DASH.M.map(rate))); }
-    else if(kind==='car'){ if(!DASH.C) await loadDash(); csvDownload(`차량별집계_${tag}.csv`, objsToRows(DASH.C)); }
+    else if(kind==='car'){ const C=await rpc('fn_car_summary',{p_from:f.from,p_to:f.to,p_basis:f.basis}); csvDownload(`차량별집계_전체_${tag}.csv`, objsToRows(C.sort((x,y)=>y.db_count-x.db_count))); }
     else if(kind==='lead_media'){ if(!DASH.LM) await loadDash(); csvDownload(`리드타임_매체별_${tag}.csv`, objsToRows(DASH.LM)); }
     else if(kind==='lead_car'){ if(!DASH.LC) await loadDash(); csvDownload(`리드타임_차량별_${tag}.csv`, objsToRows(DASH.LC)); }
     else if(kind==='unmatched'){ const rows=await selectAll('v_sales_unmatched'); csvDownload('미매칭매출.csv', objsToRows(rows)); }
@@ -721,8 +766,31 @@ async function dl(kind){
   }catch(e){ $('#dlMsg').textContent='실패: '+sqlErr(e); }
 }
 
+/* ============================ 로그 (관리자) ============================ */
+const ACTION_KO={login:'로그인',logout:'로그아웃',password_change:'비밀번호 변경',upload:'업로드',batch_toggle:'배치 활성/비활성',update:'수정',insert:'기입',delete:'삭제',agg_refresh:'집계 갱신'};
+const TARGET_KO={auth:'계정',media_map:'매체 마스터',car_map:'차량 마스터',ad_spend:'광고비',upload_batches:'업로드 배치',admin_users:'관리자 계정',agg:'집계'};
+function detailText(d){ if(!d) return ''; if(typeof d!=='object') return String(d);
+  return Object.entries(d).map(([k,v])=> (v&&typeof v==='object'&&'old' in v&&'new' in v) ? `${k}: ${v.old??'(없음)'} → ${v.new??'(없음)'}` : `${k}: ${typeof v==='object'?JSON.stringify(v):v}`).join(' · '); }
+let LOGROWS=[];
+async function loadLog(){
+  try{
+    const from=$('#lgFrom').value, to=$('#lgTo').value; if(!from||!to) return;
+    const toEx=new Date(to+'T00:00:00'); toEx.setDate(toEx.getDate()+1);
+    LOGROWS=await rpc('fn_activity_log',{p_from:from+'T00:00:00+09:00', p_to:toEx.toISOString(), p_actor:$('#lgActor').value.trim(), p_action:$('#lgAction').value, p_limit:+$('#lgLimit').value});
+    $('#lgMsg').textContent=`${fmt(LOGROWS.length)}건`;
+    renderTable('tLog', ['일시','계정','동작','대상','대상 키','내용'], LOGROWS.map(r=>[kst(r.at), esc(r.actor||''), esc(ACTION_KO[r.action]||r.action), esc(TARGET_KO[r.target]||r.target||''), esc(r.target_key||''), `<span style="white-space:normal">${esc(detailText(r.detail))}</span>`]), {left:[0,1,2,3,4,5]});
+  }catch(e){ $('#lgMsg').innerHTML='<span class="pill bad">조회 실패</span> '+esc(sqlErr(e))+' (관리자 권한이 없으면 조회되지 않습니다)'; }
+}
+function dlLog(){ if(!LOGROWS.length) return toast('먼저 조회하세요'); csvDownload(`활동로그_${$('#lgFrom').value}_${$('#lgTo').value}.csv`, [['일시','계정','동작','대상','대상키','내용'], ...LOGROWS.map(r=>[kst(r.at), r.actor, ACTION_KO[r.action]||r.action, TARGET_KO[r.target]||r.target, r.target_key, detailText(r.detail)])]); }
+async function loadAdmins(){
+  const {data,error}=await sb.from('admin_users').select('*').order('added_at'); if(error) return toast(sqlErr(error));
+  renderTable('tAdmins', ['이메일','추가한 사람','추가 일시',''], data.map(a=>[esc(a.email), esc(a.added_by||''), kst(a.added_at), a.email===user.email?'<span class="muted">본인</span>':`<button class="btn sec sm" onclick="delAdmin('${esc(a.email)}')">제거</button>`]), {left:[0,1,2]});
+}
+async function addAdmin(){ const e=$('#adminEmail').value.trim().toLowerCase(); if(!e) return; const {error}=await sb.from('admin_users').insert({email:e, added_by:user.email}); if(error) return toast(sqlErr(error)); $('#adminEmail').value=''; toast('추가됨'); loadAdmins(); }
+async function delAdmin(e){ if(!confirm(e+' 의 관리자 권한을 제거할까요?')) return; const {error}=await sb.from('admin_users').delete().eq('email',e); if(error) return toast(sqlErr(error)); loadAdmins(); }
+
 /* ============================ 설정 ============================ */
-async function refreshAgg(){ toast('집계 갱신 중…',8000); try{ const r=await rpc('fn_refresh_agg',{}); toast(`집계 갱신 완료 (${fmt(r.media_rows)}행)`); showStatus(); }catch(e){ toast('실패: '+sqlErr(e),6000); } }
+async function refreshAgg(){ loading(true,'집계·IP 중복 갱신 중… (10~60초)',50); try{ const r=await rpc('fn_refresh_agg',{}); toast(`집계 갱신 완료 (${fmt(r.media_rows)}행)`); showStatus(); }catch(e){ toast('실패: '+sqlErr(e),6000); } finally{ loading(false); } }
 async function showStatus(){ try{ const st=await rpc('fn_data_status',{}); $('#setStatus').textContent=JSON.stringify(st,null,2); }catch(e){ $('#setStatus').textContent=sqlErr(e); } }
 
 init();
