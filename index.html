@@ -316,24 +316,50 @@ async function selectAll(table, build){ // 1000행 제한 우회 페이지네이
 }
 
 /* ============================ 인증 ============================ */
+let recovering=false;
 async function init(){
   const cfg=getCfg();
   if(!cfg){ $('#cfgBox').style.display='block'; $('#loginBox').style.display='none'; return; }
-  sb = supabase.createClient(cfg.url.replace(/\/+$/,''), cfg.key);
-  $('#setUrl').value=cfg.url; $('#setKey').value=cfg.key; $('#loginUrl').textContent=cfg.url;
+  sb = supabase.createClient(cfg.url, cfg.key);
+  $('#setUrlView').textContent=cfg.url;
+  // 비밀번호 재설정 메일 링크로 돌아온 경우 (#type=recovery)
+  if(/type=recovery/.test(location.hash)) { recovering=true; showRecover(); }
+  sb.auth.onAuthStateChange((ev, s)=>{
+    if(ev==='PASSWORD_RECOVERY'){ recovering=true; showRecover(); return; }
+    if(ev==='SIGNED_OUT'){ location.reload(); }
+  });
   const {data:{session}} = await sb.auth.getSession();
-  if(session) afterLogin(session.user);
-  sb.auth.onAuthStateChange((ev, s)=>{ if(ev==='SIGNED_OUT'){ location.reload(); } });
+  if(session && !recovering) afterLogin(session.user);
 }
+function showRecover(){ $('#loginBox').style.display='none'; $('#recoverBox').style.display='block'; $('#login').style.display='flex'; }
 async function login(){
   $('#loginMsg').textContent='로그인 중…';
   const {data,error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(), password:$('#pw').value});
-  if(error){ $('#loginMsg').textContent='로그인 실패: '+sqlErr(error); return; }
+  if(error){ $('#loginMsg').textContent='로그인 실패: '+(/Invalid login credentials/i.test(error.message)?'이메일 또는 비밀번호가 올바르지 않습니다':sqlErr(error)); return; }
   afterLogin(data.user);
+}
+async function forgotPw(){
+  const email=$('#email').value.trim(); if(!email) return $('#loginMsg').textContent='이메일을 먼저 입력한 뒤 "비밀번호 찾기"를 누르세요';
+  $('#loginMsg').textContent='메일 발송 중…';
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:SITE_URL});
+  $('#loginMsg').textContent = error ? '발송 실패: '+sqlErr(error) : `${email} 로 재설정 링크를 보냈습니다. 메일의 링크를 열면 새 비밀번호를 설정할 수 있습니다 (스팸함도 확인).`;
+}
+async function setNewPw(){
+  const p1=$('#npw1').value, p2=$('#npw2').value;
+  if(p1.length<8) return $('#recoverMsg').textContent='8자 이상 입력하세요'; if(p1!==p2) return $('#recoverMsg').textContent='두 비밀번호가 다릅니다';
+  const {data,error}=await sb.auth.updateUser({password:p1});
+  if(error) return $('#recoverMsg').textContent='실패: '+sqlErr(error)+' (링크가 만료되었으면 로그인 화면에서 다시 "비밀번호 찾기")';
+  history.replaceState(null,'',location.pathname); recovering=false; $('#recoverBox').style.display='none'; $('#loginBox').style.display='block'; toast('비밀번호가 변경되었습니다'); afterLogin(data.user);
+}
+async function changePw(){
+  const p1=$('#cpw1').value, p2=$('#cpw2').value;
+  if(p1.length<8) return toast('8자 이상 입력하세요'); if(p1!==p2) return toast('두 비밀번호가 다릅니다');
+  const {error}=await sb.auth.updateUser({password:p1}); if(error) return toast('실패: '+sqlErr(error));
+  $('#cpw1').value=''; $('#cpw2').value=''; toast('비밀번호가 변경되었습니다');
 }
 async function logout(){ await sb.auth.signOut(); }
 function afterLogin(u){
-  user=u; $('#who').textContent=u.email; $('#login').style.display='none';
+  user=u; $('#who').textContent=u.email; $('#setEmail').textContent=u.email; $('#login').style.display='none';
   const today=new Date(); const y=today.getFullYear();
   $('#fFrom').value=`${y}-01-01`; $('#fTo').value=today.toISOString().slice(0,10);
   $('#spDate').value=today.toISOString().slice(0,10); $('#spMonth').value=today.toISOString().slice(0,7);
