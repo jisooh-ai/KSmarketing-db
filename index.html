@@ -622,10 +622,13 @@ async function loadDash(){
 }
 let _ipLoop=false;
 async function ipMigrateLoop(pending){
-  if(_ipLoop) return; _ipLoop=true; const tot=pending;
-  try{ while(pending>0){ $('#status').innerHTML += ` <span class="pill warn" id="ipPill">IP 중복 판정 준비 중… 남은 ${fmt(pending)}행 (자동 처리, 화면은 계속 사용 가능)</span>`;
-      const r=await rpc('fn_refresh_agg',{}); pending=r.ip_pending||0; const el=$('#ipPill'); if(el) el.remove(); }
-    toast('IP 중복 판정 완료 — 다시 조회하면 반영됩니다', 6000); loadDash();
+  if(_ipLoop) return; _ipLoop=true;
+  try{ while(pending>0){ const old=$('#ipPill'); if(old) old.remove();
+      $('#status').innerHTML += ` <span class="pill warn" id="ipPill">IP 중복 판정 준비 중… 남은 ${fmt(pending)}행 (자동 처리, 화면은 계속 사용 가능)</span>`;
+      const r=await rpc('fn_ip_migrate',{p_n:10000}); pending=r.ip_pending||0; }
+    const el=$('#ipPill'); if(el) el.textContent='IP 이관 완료 · 집계 갱신 중…';
+    await rpc('fn_refresh_agg',{});
+    toast('IP 중복 판정 완료 — 반영된 결과로 다시 조회합니다', 5000); loadDash();
   }catch(e){ toast('IP 이관 중단: '+sqlErr(e)+' (다시 조회하면 이어서 진행)', 6000); }
   finally{ _ipLoop=false; }
 }
@@ -753,7 +756,7 @@ async function doUpload(){
     }
     await sb.from('upload_batches').update({row_count:done}).eq('id',b.id);
     $('#upMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(done)}행 저장 (배치 #${b.id}) · 집계 갱신 중…`;
-    if(kind==='inquiry'){ loading(true,'집계·IP 중복 갱신 중… (10~60초)',97); try{ await rpc('fn_refresh_agg',{}); }catch(e){ toast('집계 갱신 실패: '+sqlErr(e)+' — 설정 탭에서 [집계 갱신]을 다시 눌러주세요', 6000); } }
+    if(kind==='inquiry'){ loading(true,'집계·IP 중복 갱신 중…',97); try{ let m={ip_pending:1}; while((m.ip_pending||0)>0){ m=await rpc('fn_ip_migrate',{p_n:10000}); } await rpc('fn_refresh_agg',{}); }catch(e){ toast('집계 갱신 실패: '+sqlErr(e)+' — 설정 탭에서 [집계 갱신]을 다시 눌러주세요', 6000); } }
     $('#upMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(done)}행 저장 (배치 #${b.id})`; toast('업로드 완료'); UP=null; $('#upFile').value=''; loadBatches(); loading(false);
   }catch(e){ loading(false); $('#upMsg').innerHTML='<span class="pill bad">업로드 중단</span> '+esc(sqlErr(e))+' — 이미 저장된 행은 유지됩니다. 같은 파일을 다시 검증·업로드하면 유입은 갱신, 매출은 새 배치로 들어가므로 실패한 배치는 비활성화하세요.'; $('#upGo').disabled=false; }
 }
@@ -1013,7 +1016,7 @@ async function addAdmin(){ const e=$('#adminEmail').value.trim().toLowerCase(); 
 async function delAdmin(e){ if(!confirm(e+' 의 관리자 권한을 제거할까요?')) return; const {error}=await sb.from('admin_users').delete().eq('email',e); if(error) return toast(sqlErr(error)); loadAdmins(); }
 
 /* ============================ 설정 ============================ */
-async function refreshAgg(){ loading(true,'집계·IP 중복 갱신 중…',30); try{ let r=await rpc('fn_refresh_agg',{}); let n=1; while((r.ip_pending||0)>0){ loading(true,`IP 이관 남은 ${fmt(r.ip_pending)}행 … (${n++}회차)`,60); r=await rpc('fn_refresh_agg',{}); } toast(`집계 갱신 완료 (${fmt(r.media_rows)}행)`); showStatus(); }catch(e){ toast('실패: '+sqlErr(e),6000); } finally{ loading(false); } }
+async function refreshAgg(){ loading(true,'IP 이관 확인 중…',10); try{ let m=await rpc('fn_ip_migrate',{p_n:10000}); let n=1; while((m.ip_pending||0)>0){ loading(true,`IP 이관 남은 ${fmt(m.ip_pending)}행 … (${n++}회차)`,50); m=await rpc('fn_ip_migrate',{p_n:10000}); } loading(true,'집계 갱신 중…',80); const r=await rpc('fn_refresh_agg',{}); toast(`집계 갱신 완료 (${fmt(r.media_rows)}행)`); showStatus(); }catch(e){ toast('실패: '+sqlErr(e),6000); } finally{ loading(false); } }
 async function showStatus(){ try{ const st=await rpc('fn_data_status',{}); $('#setStatus').textContent=JSON.stringify(st,null,2); }catch(e){ $('#setStatus').textContent=sqlErr(e); } }
 
 init();
