@@ -150,12 +150,13 @@
     <div class="tw" style="margin-top:10px"><table id="tTrend"></table></div>
   </div>
 
-  <div class="card"><h2>브랜드별 요약 <span class="muted">(매체 마스터의 브랜드 기준)</span></h2><div class="tw"><table id="tBrand"></table></div></div>
+  <div class="card"><h2>브랜드별 요약 <span class="muted">(매체 마스터의 브랜드 기준 · 광고비·ROAS·CPA는 브랜드 단위로 집계)</span></h2><div class="tw"><table id="tBrand"></table></div>
+    <h3>브랜드 × 광고채널 광고비</h3><div class="tw"><table id="tSpendCh"></table></div></div>
   <div class="grid2">
     <div class="card"><h2>플랫폼별</h2><div class="tw"><table id="tPlatform"></table></div></div>
     <div class="card"><h2>매체별 DB·계약 TOP 15</h2><canvas id="chMedia" style="max-height:420px"></canvas></div>
   </div>
-  <div class="card"><h2>매체별 성과 <span class="muted">(선택 기간 합계 · 리드타임은 정상 계약 기준)</span></h2><div class="tw" style="max-height:560px"><table id="tMedia"></table></div></div>
+  <div class="card"><h2>매체별 성과 <span class="muted">(선택 기간 합계 · 리드타임은 정상 계약 기준 · 광고비는 브랜드 단위라 매체별 표에는 없음)</span></h2><div class="tw" style="max-height:560px"><table id="tMedia"></table></div></div>
 
   <div class="grid2">
     <div class="card"><h2>문의 많은 차량 TOP 15 <span class="muted">(문의수 순)</span></h2><div class="tw"><table id="tCarInq"></table></div></div>
@@ -216,30 +217,37 @@
 <!-- ================= 광고비 ================= -->
 <section class="page" id="p-spend">
   <div class="card">
-    <h2>광고비 입력 (일 단위)</h2>
+    <h2>광고비 입력 (일 단위 · 브랜드 × 광고채널)</h2>
     <div class="row">
       <div><label>일자</label><input type="date" id="spDate"></div>
-      <div><label>표준매체명</label><input id="spMedia" list="mediaStdList" style="width:260px" placeholder="매체 마스터의 표준매체명"><datalist id="mediaStdList"></datalist></div>
+      <div><label>브랜드</label><select id="spBrand" style="min-width:160px"></select></div>
+      <div><label>광고채널</label><select id="spChannel"></select></div>
       <div><label>광고비(원)</label><input type="number" id="spCost" min="0"></div>
       <div><label>노출</label><input type="number" id="spImp" min="0"></div>
       <div><label>클릭</label><input type="number" id="spClk" min="0"></div>
       <div><label>메모</label><input id="spMemo"></div>
       <div><button class="btn" onclick="saveSpend()">저장</button></div>
     </div>
-    <div class="muted" style="margin-top:6px">같은 일자+매체를 다시 저장하면 덮어씁니다.</div>
+    <div class="muted" style="margin-top:6px">같은 일자+브랜드+채널을 다시 저장하면 덮어씁니다. 브랜드 목록은 매핑 탭의 매체 마스터 브랜드에서 가져옵니다.</div>
   </div>
   <div class="card">
-    <h2>광고비 일괄 업로드</h2>
+    <h2>양식 다운로드 → 채워서 일괄 업로드</h2>
     <div class="row">
-      <div><label>파일 (.xlsx/.csv) — 헤더: 일자, 매체, 광고비, 노출, 클릭</label><input type="file" id="spFile" accept=".xlsx,.xls,.csv"></div>
+      <div><label>양식 월</label><input type="month" id="spTplMonth"></div>
+      <div><label>브랜드 (단일·복수)</label><div class="ms" id="msSpend"><button class="btn sec" type="button" onclick="this.parentNode.classList.toggle('open')">브랜드 선택 ▾</button><div class="pop"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msSpend',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msSpend',false)">전체 해제</button></div><div class="list"></div></div></div></div>
+      <div><label>파일 형태</label><select id="spTplMode"><option value="one">브랜드 모두 한 파일</option><option value="each">브랜드별 파일 각각</option></select></div>
       <div><button class="btn sec" onclick="downloadSpendTemplate()">양식 다운로드</button></div>
+    </div>
+    <div class="muted" style="margin-top:6px">양식 컬럼: <b>일자 · 브랜드 · 네이버 파워링크 · 네이버 GFA · 카카오 키워드 광고 · 카카오 모먼트 · 카카오 친구톡 · 구글 애즈 · 메타 광고 · 틱톡 광고 · 당근 광고 · 블로그 인플루언서 · 유튜브 PPL · 기타 · 메모</b> — 선택한 브랜드와 해당 월의 날짜가 미리 채워져 있고, 채널 칸에 금액(원)만 적으면 됩니다. 빈 칸은 건너뜁니다(0 으로 지우려면 0 입력).</div>
+    <div class="row" style="margin-top:10px">
+      <div><label>채운 양식 (.xlsx/.csv)</label><input type="file" id="spFile" accept=".xlsx,.xls,.csv"></div>
       <div><button class="btn" onclick="uploadSpend()">업로드</button></div>
     </div>
     <div id="spMsg" class="muted" style="margin-top:8px"></div>
   </div>
   <div class="card">
     <h2>월별 광고비 내역</h2>
-    <div class="row"><div><label>월</label><input type="month" id="spMonth"></div><div><button class="btn sec" onclick="loadSpend()">조회</button></div></div>
+    <div class="row"><div><label>월</label><input type="month" id="spMonth"></div><div><label>브랜드</label><select id="spListBrand"><option value="">전체</option></select></div><div><button class="btn sec" onclick="loadSpend()">조회</button></div></div>
     <div class="tw" style="margin-top:10px"><table id="tSpend"></table></div>
   </div>
 </section>
@@ -293,6 +301,8 @@
       <button class="btn sec" onclick="dl('media_day')">매체 × 일별</button>
       <button class="btn sec" onclick="dl('media_total')">매체별 합계</button>
       <button class="btn sec" onclick="dl('brand_total')">브랜드별 합계</button>
+      <button class="btn sec" onclick="dl('brand_month')">브랜드 × 월별</button>
+      <button class="btn sec" onclick="dl('spend_channel')">광고비 브랜드 × 채널 (월별)</button>
       <button class="btn sec" onclick="dl('car')">차량별 집계</button>
       <button class="btn sec" onclick="dl('lead_media')">리드타임 매체별</button>
       <button class="btn sec" onclick="dl('lead_car')">리드타임 차량별</button>
@@ -303,7 +313,7 @@
     <div class="row">
       <button class="btn sec" onclick="dlRaw('inquiry')">유입 문의 DB raw</button>
       <button class="btn sec" onclick="dlRaw('sales')">매출 raw</button>
-      <button class="btn sec" onclick="dlRaw('ad_spend')">광고비 raw</button>
+      <button class="btn sec" onclick="dlRaw('ad_spend')">광고비 raw (브랜드×채널)</button>
       <button class="btn sec" onclick="dl('unmatched')">미매칭 매출 (유입 매체에 없는 행)</button>
     </div>
     <div class="muted" style="margin-top:6px">유입 raw는 건수가 많으면(수만 건 이상) 1~3분 걸립니다. 고객명은 "저장 안 함"으로 올렸으면 비어 있고, 고객IP는 저장하지 않으므로 항상 비어 있습니다.</div>
@@ -440,13 +450,14 @@ function afterLogin(u){
   $('#dFrom').value=`${y}-01-01`; $('#dTo').value=today.toISOString().slice(0,10);
   const t2=new Date(); t2.setDate(t2.getDate()-30); $('#lgFrom').value=t2.toISOString().slice(0,10); $('#lgTo').value=today.toISOString().slice(0,10);
   sb.from('admin_users').select('email').eq('email',u.email).then(({data})=>{ if(data&&data.length){ $('#navLog').style.display=''; } });
-  loadDash(); loadBatches(); loadMediaStdList();
+  $('#spTplMonth').value=today.toISOString().slice(0,7);
+  loadDash(); loadBatches(); loadBrandList();
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('section.page').forEach(s=>s.classList.toggle('on', s.id==='p-'+b.dataset.p));
   if(b.dataset.p==='map'){ loadMediaMap(); loadCarMap(); }
-  if(b.dataset.p==='spend'){ loadSpend(); loadMediaStdList(); }
+  if(b.dataset.p==='spend'){ loadBrandList().then(loadSpend); }
   if(b.dataset.p==='set'){ showStatus(); }
   if(b.dataset.p==='upload'){ loadBatches(); }
   if(b.dataset.p==='log'){ loadLog(); loadAdmins(); }
@@ -473,11 +484,15 @@ function filters(){
 }
 const charts={};
 function chart(id, cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart($('#'+id), cfg); }
-function sumRows(rows, f){
+function sumRows(rows, f, spend){
   const s={db:0,net:0,ipdb:0,both:0,contracts:0,revenue:0,carprice:0,cost:0,impressions:0,clicks:0};
-  rows.forEach(r=>{ s.db+=r.db_count; s.net+=r.net_db; s.ipdb+=(r.ip_db||0); s.both+=(r.both_db||0); s.contracts+=r.contracts; s.revenue+=+r.revenue; s.carprice+=+(r.car_price_sum||0); s.cost+=+(r.cost||0); s.impressions+=+(r.impressions||0); s.clicks+=+(r.clicks||0); });
+  rows.forEach(r=>{ s.db+=r.db_count||0; s.net+=r.net_db||0; s.ipdb+=(r.ip_db||0); s.both+=(r.both_db||0); s.contracts+=r.contracts||0; s.revenue+=+(r.revenue||0); s.carprice+=+(r.car_price_sum||0); });
+  (spend||[]).forEach(r=>{ s.cost+=+(r.cost||0); s.impressions+=+(r.impressions||0); s.clicks+=+(r.clicks||0); });
   s.dbSel = f.dbField==='both_db'? s.both : f.dbField==='net_db'? s.net : f.dbField==='ip_db'? s.ipdb : s.db; return s;
 }
+// 광고비 없는 표용 (매체·플랫폼)
+function metricColsNoCost(s){ return [fmt(s.db), fmt(s.dbSel), fmt(s.contracts), won(s.revenue), won(s.carprice), pct(s.contracts,s.dbSel)]; }
+const METRIC_H_NOCOST = ['DB(전체)','DB(제외후)','계약수','매출(계약마진)','차량가 합계','전환율'];
 // 열: DB(전체) | DB(제외후) | 계약 | 매출 | 마진 | 광고비 | ROAS | CPA(DB) | CPA(계약) | 전환율   ※ CPA·전환율은 제외후 DB 기준
 function metricCols(s){ return [fmt(s.db), fmt(s.dbSel), fmt(s.contracts), won(s.revenue), won(s.carprice), won(s.cost), div(s.revenue,s.cost,1), s.cost?won(s.cost/(s.dbSel||NaN)):'-', s.cost?won(s.cost/(s.contracts||NaN)):'-', pct(s.contracts,s.dbSel)]; }
 const METRIC_H = ['DB(전체)','DB(제외후)','계약수','매출(계약마진)','차량가 합계','광고비','ROAS','CPA(DB)','CPA(계약)','전환율'];
@@ -496,13 +511,16 @@ function renderTable(id, headers, rows, opts={}){
     trs.forEach(tr=>tb.appendChild(tr));
   });
 }
-function trendFilter(Pf){ const sel=msSel('msTrend'); const n=document.querySelectorAll('#msTrend input').length; if(!sel.length||sel.length===n) return Pf; return Pf.filter(r=>sel.includes(brandOf(r))); }
-function trendRefilter(){ if(!DASH.Pall) return; const Pt=trendFilter(DASH.Pall); renderTrend(Pt, DASH.f, sumRows(Pt, DASH.f)); }
+function trendSel(){ const sel=msSel('msTrend'); const n=document.querySelectorAll('#msTrend input').length; return (!sel.length||sel.length===n)? null : sel; }
+function trendFilter(Pf){ const sel=trendSel(); return sel? Pf.filter(r=>sel.includes(brandOf(r))) : Pf; }
+function trendSpend(){ const sel=trendSel(); const S=DASH.S||[]; return sel? S.filter(r=>sel.includes(r.brand)) : S; }
+function trendRefilter(){ if(!DASH.Pall) return; const Pt=trendFilter(DASH.Pall); renderTrend(Pt, DASH.f, sumRows(Pt, DASH.f, trendSpend())); }
 function renderTrend(Pf, f, s){
-    const byP=groupBy(Pf, r=>r.period); const periods=[...byP.keys()].sort();
+    const Sp=trendSpend(); const bySP=groupBy(Sp, r=>r.period);
+  const byP=groupBy(Pf, r=>r.period); const periods=[...new Set([...byP.keys(), ...bySP.keys()])].sort();
   const plabel = p => { if(f.grain==='month') return p.slice(0,7); if(f.grain==='year') return p.slice(0,4);
     if(f.grain==='week'){ const d=new Date(p+'T00:00:00'); const e=new Date(d); e.setDate(d.getDate()+6); const md=x=>`${x.getMonth()+1}/${x.getDate()}`; return `${md(d)}~${md(e)} 주`; } return p; };
-  const tr = periods.map(p=>{ const x=sumRows(byP.get(p),f); return {p, label:plabel(p), ...x}; });
+  const tr = periods.map(p=>{ const x=sumRows(byP.get(p)||[],f,bySP.get(p)||[]); return {p, label:plabel(p), ...x}; });
   renderTable('tTrend', ['기간',...METRIC_H], tr.map(x=>[x.label, ...metricCols(x)]), {foot:['합계',...metricCols(s)]});
   chart('chTrend',{data:{labels:tr.map(x=>x.label), datasets:[
     {type:'bar',label:'DB(전체)',data:tr.map(x=>x.db),backgroundColor:'rgba(37,99,235,.18)',yAxisID:'y'},
@@ -531,12 +549,12 @@ async function loadDash(){
     let D = await rpc('fn_dashboard',args);
     if(D.status.inquiries>0 && !(D.status.agg_rows>0)){ loading(true,'집계 테이블이 비어 있어 갱신 중… (최초 1회, 10~60초)',50); await rpc('fn_refresh_agg',{}); loading(true,'다시 조회 중…',75); D = await rpc('fn_dashboard',args); }
     loading(true,'화면 그리는 중…',90);
-    const {status:st, P, M, C, L0, LM, LC, LB, LD, LMB, LPL} = D;
+    const {status:st, P, M, S, C, L0, LM, LC, LB, LD, LMB, LPL} = D;
     const took=((Date.now()-t0)/1000).toFixed(1);
     const inc = r => f.types.includes(r.media_type) && (!f.brands.length || f.brands.includes(brandOf(r)));
-    const Pf=P.filter(inc), Mf=M.filter(inc);
-    if(st.brands && JSON.stringify(st.brands)!==JSON.stringify(BRANDS)){ BRANDS=st.brands; const keep=msSel('msBrand'); msFill('msBrand',BRANDS); document.querySelectorAll('#msBrand input').forEach(i=>i.checked=keep.includes(i.value)); msLabel('msBrand'); msFill('msTrend',BRANDS,trendRefilter); msFill('msDl',BRANDS); }
-    DASH={f, P:Pf, M:Mf, C, L0, LM, LC, LB, LD, LMB, LPL};
+    const Pf=P.filter(inc), Mf=M.filter(inc); const Sf=(S||[]).filter(r=>!f.brands.length || f.brands.includes(r.brand));
+    if(st.brands && JSON.stringify(st.brands)!==JSON.stringify(BRANDS)){ BRANDS=st.brands; const keep=msSel('msBrand'); msFill('msBrand',BRANDS); document.querySelectorAll('#msBrand input').forEach(i=>i.checked=keep.includes(i.value)); msLabel('msBrand'); msFill('msTrend',BRANDS,trendRefilter); msFill('msDl',BRANDS); if(!document.querySelector('#msSpend input')) msFill('msSpend',BRANDS); }
+    DASH={f, P:Pf, M:Mf, S:Sf, C, L0, LM, LC, LB, LD, LMB, LPL};
     const unc = M.filter(r=>r.media_type==='미분류').length;
     $('#status').innerHTML = `<span class="pill ok">조회 완료 ${took}초</span>` + (f.brands.length?` <span class="pill">브랜드: ${esc(f.brands.join(', '))}</span>`:'') + ` 유입 ${fmt(st.inquiries)}건 (${(st.inquiry_min||'').slice(0,10)} ~ ${(st.inquiry_max||'').slice(0,10)}) · 활성 매출 ${fmt(st.sales_active)}건 (계약일 ${st.contract_min||'-'} ~ ${st.contract_max||'-'}) · 광고비 입력 ${fmt(st.ad_spend_days)}일 (최근 ${st.ad_spend_max||'-'})`
       + (st.sales_unmatched? ` · <span class="pill warn">미매칭 매출 ${fmt(st.sales_unmatched)}건 (유입 매체에 없음, 집계 제외)</span>`:'')
@@ -546,14 +564,14 @@ async function loadDash(){
       + (st.agg_refreshed_at? ` · <span class="muted">집계 갱신 ${kst(st.agg_refreshed_at)}</span>`:'');
 
     // KPI
-    const s=sumRows(Mf,f); const lt=L0[0]||{};
+    const s=sumRows(Mf,f,Sf); const lt=L0[0]||{};
     $('#kpis').innerHTML=[
       ['DB수 (전체)', fmt(s.db), `CRM중복 ${fmt(s.db-s.net)} · IP중복 ${fmt(s.db-s.ipdb)}`],
       ['DB수 ('+f.dbLabel+')', fmt(s.dbSel), f.dedup?`제외 ${fmt(s.db-s.dbSel)}건 (${pct(s.db-s.dbSel,s.db)})`:'중복 제외 안 함'],
       ['계약수', fmt(s.contracts), `전환율 ${pct(s.contracts,s.dbSel)}`],
       ['매출 (계약마진 합)', won(s.revenue), `건당 ${won(s.contracts? s.revenue/s.contracts:null)}`],
       ['차량가 합계', won(s.carprice), `차량가 대비 매출 ${pct(s.revenue,s.carprice)}`],
-      ['광고비', won(s.cost), s.cost?`노출 ${fmt(s.impressions)} · 클릭 ${fmt(s.clicks)}`:'광고비 미입력'],
+      ['광고비', won(s.cost), s.cost?`노출 ${fmt(s.impressions)} · 클릭 ${fmt(s.clicks)}`:'광고비 미입력 (광고비 탭)'],
       ['ROAS', s.cost? fmt(s.revenue/s.cost,2)+'x' : '-', s.cost? '매출(계약마진) ÷ 광고비':'광고비 입력 필요'],
       ['CPA (DB당)', s.cost&&s.dbSel? fmt(s.cost/s.dbSel)+'원':'-', ''],
       ['CPA (계약당)', s.cost&&s.contracts? fmt(s.cost/s.contracts)+'원':'-', ''],
@@ -565,15 +583,20 @@ async function loadDash(){
     // 매체별
     const ltByMedia=new Map(LM.map(x=>[x.dim_value,x]));
     const byM=groupBy(Mf, r=>r.media_std); const mr=[...byM.entries()].map(([k,rows])=>({k, type:rows[0].media_type, brand:rows[0].brand, lt:ltByMedia.get(k), ...sumRows(rows,f)})).sort((a,b)=>b.dbSel-a.dbSel);
-    renderTable('tMedia', ['매체','유형','브랜드',...METRIC_H,'리드타임 중앙값','리드타임 평균','7일내'], mr.map(x=>[esc(x.k), esc(x.type), esc(x.brand??''), ...metricCols(x), x.lt?fmt(x.lt.median_days,1)+'일':'-', x.lt?fmt(x.lt.avg_days,1)+'일':'-', x.lt?fmt(x.lt.within7_pct,1)+'%':'-']), {left:[0,1,2], foot:['합계','','',...metricCols(s), lt.n?fmt(lt.median_days,1)+'일':'-', lt.n?fmt(lt.avg_days,1)+'일':'-', lt.n?fmt(lt.within7_pct,1)+'%':'-']});
+    renderTable('tMedia', ['매체','유형','브랜드',...METRIC_H_NOCOST,'리드타임 중앙값','리드타임 평균','7일내'], mr.map(x=>[esc(x.k), esc(x.type), esc(x.brand??''), ...metricColsNoCost(x), x.lt?fmt(x.lt.median_days,1)+'일':'-', x.lt?fmt(x.lt.avg_days,1)+'일':'-', x.lt?fmt(x.lt.within7_pct,1)+'%':'-']), {left:[0,1,2], foot:['합계','','',...metricColsNoCost(s), lt.n?fmt(lt.median_days,1)+'일':'-', lt.n?fmt(lt.avg_days,1)+'일':'-', lt.n?fmt(lt.within7_pct,1)+'%':'-']});
     const top=mr.slice(0,15);
     chart('chMedia',{type:'bar',data:{labels:top.map(x=>x.k),datasets:[{label:'DB(전체)',data:top.map(x=>x.db),backgroundColor:'rgba(37,99,235,.25)'},{label:'DB('+f.dbLabel+')',data:top.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.7)'},{label:'계약수',data:top.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.8)'}]},options:{indexAxis:'y',scales:{x:{beginAtZero:true}}}});
 
     // 브랜드/플랫폼
-    const byB=groupBy(Mf, r=>r.brand||'(브랜드 미지정)'); const br=[...byB.entries()].map(([k,rows])=>({k,...sumRows(rows,f)})).sort((a,b)=>b.dbSel-a.dbSel);
+    const bySB=groupBy(Sf, r=>r.brand);
+    const byB=groupBy(Mf, brandOf); const brandKeys=[...new Set([...byB.keys(), ...bySB.keys()])];
+    const br=brandKeys.map(k=>({k,...sumRows(byB.get(k)||[],f,bySB.get(k)||[])})).sort((a,b)=>b.dbSel-a.dbSel);
     renderTable('tBrand', ['브랜드',...METRIC_H], br.map(x=>[esc(x.k),...metricCols(x)]), {foot:['합계',...metricCols(s)]});
+    const chKeys=CHANNELS.filter(c=>Sf.some(r=>r.channel===c)).concat([...new Set(Sf.map(r=>r.channel))].filter(c=>!CHANNELS.includes(c)));
+    const chRows=[...bySB.entries()].map(([b,rows])=>{ const m={}; rows.forEach(r=>{ m[r.channel]=(m[r.channel]||0)+ +r.cost; }); const tot=Object.values(m).reduce((a,x)=>a+x,0); return [esc(b), won(tot), ...chKeys.map(c=>m[c]?won(m[c]):'-')]; });
+    renderTable('tSpendCh', ['브랜드','광고비 합계',...chKeys], chRows, {foot:['합계', won(s.cost), ...chKeys.map(c=>won(Sf.filter(r=>r.channel===c).reduce((a,r)=>a+ +r.cost,0)))]});
     const byPl=groupBy(Mf, r=>r.platform||'(플랫폼 미지정)'); const pl=[...byPl.entries()].map(([k,rows])=>({k,...sumRows(rows,f)})).sort((a,b)=>b.dbSel-a.dbSel);
-    renderTable('tPlatform', ['플랫폼',...METRIC_H], pl.map(x=>[esc(x.k),...metricCols(x)]));
+    renderTable('tPlatform', ['플랫폼',...METRIC_H_NOCOST], pl.map(x=>[esc(x.k),...metricColsNoCost(x)]));
 
     // 차량
     const cars=C.map(r=>({...r, dbSel: r[f.dbField]??r.db_count}));
@@ -704,42 +727,63 @@ async function loadBatches(){
 async function toggleBatch(id, active){ const {error}=await sb.from('upload_batches').update({is_active:active}).eq('id',id); if(error) return toast(sqlErr(error)); loadBatches(); }
 
 /* ============================ 광고비 ============================ */
-async function loadMediaStdList(){
-  try{ const rows=await selectAll('media_map', q=>q.select('media_std,media_type')); const set=[...new Set(rows.map(r=>r.media_std))].sort((a,b)=>a.localeCompare(b,'ko')); $('#mediaStdList').innerHTML=set.map(s=>`<option value="${esc(s)}">`).join(''); }catch(e){}
-}
+const CHANNELS=['네이버 파워링크','네이버 GFA','카카오 키워드 광고','카카오 모먼트','카카오 친구톡','구글 애즈','메타 광고','틱톡 광고','당근 광고','블로그 인플루언서','유튜브 PPL','기타'];
+const NO_BRAND='(브랜드 없음)';
+async function loadBrandList(){ // 매체 마스터의 브랜드 목록
+  try{ const rows=await selectAll('media_map', q=>q.select('brand')); BRANDS=[...new Set(rows.map(r=>r.brand).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+    const opts=['<option value="'+NO_BRAND+'">'+NO_BRAND+'</option>', ...BRANDS.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`)];
+    $('#spBrand').innerHTML=BRANDS.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('')+'<option value="'+NO_BRAND+'">'+NO_BRAND+'</option>';
+    $('#spListBrand').innerHTML='<option value="">전체</option>'+opts.join('');
+    $('#spChannel').innerHTML=CHANNELS.map(c=>`<option>${c}</option>`).join('');
+    if(!document.querySelector('#msSpend input')) msFill('msSpend',BRANDS);
+  }catch(e){} }
 async function saveSpend(){
-  const row={spend_date:$('#spDate').value, media_std:$('#spMedia').value.trim(), cost:+$('#spCost').value||0, impressions:$('#spImp').value?+$('#spImp').value:null, clicks:$('#spClk').value?+$('#spClk').value:null, memo:$('#spMemo').value||null, updated_at:new Date().toISOString()};
-  if(!row.spend_date||!row.media_std) return toast('일자와 매체를 입력하세요');
-  const {error}=await sb.from('ad_spend').upsert(row,{onConflict:'spend_date,media_std'}); if(error) return toast(sqlErr(error));
+  const row={spend_date:$('#spDate').value, brand:$('#spBrand').value, channel:$('#spChannel').value, cost:+$('#spCost').value||0, impressions:$('#spImp').value?+$('#spImp').value:null, clicks:$('#spClk').value?+$('#spClk').value:null, memo:$('#spMemo').value||null, updated_at:new Date().toISOString()};
+  if(!row.spend_date||!row.brand||!row.channel) return toast('일자·브랜드·채널을 입력하세요');
+  const {error}=await sb.from('ad_spend').upsert(row,{onConflict:'spend_date,brand,channel'}); if(error) return toast(sqlErr(error));
   toast('저장됨'); $('#spCost').value=''; $('#spImp').value=''; $('#spClk').value=''; loadSpend();
 }
 async function loadSpend(){
   const m=$('#spMonth').value; if(!m) return; const from=m+'-01'; const to=new Date(+m.slice(0,4), +m.slice(5,7), 0).toISOString().slice(0,10);
-  const {data,error}=await sb.from('ad_spend').select('*').gte('spend_date',from).lte('spend_date',to).order('spend_date',{ascending:false}).order('media_std').limit(2000); if(error) return toast(sqlErr(error));
+  let q=sb.from('ad_spend').select('*').gte('spend_date',from).lte('spend_date',to); const b=$('#spListBrand').value; if(b) q=q.eq('brand',b);
+  const {data,error}=await q.order('spend_date',{ascending:false}).order('brand').order('channel').limit(5000); if(error) return toast(sqlErr(error));
   const tot=data.reduce((a,r)=>a+ +r.cost,0);
-  renderTable('tSpend', ['일자','매체','광고비','노출','클릭','메모',''], data.map(r=>[r.spend_date, esc(r.media_std), fmt(r.cost), fmt(r.impressions), fmt(r.clicks), esc(r.memo||''), `<button class="btn sec sm" onclick="delSpend('${r.spend_date}','${esc(r.media_std).replace(/'/g,"\\'")}')">삭제</button>`]), {left:[0,1,5], foot:['합계','',fmt(tot),'','','','']});
+  renderTable('tSpend', ['일자','브랜드','채널','광고비','노출','클릭','메모',''], data.map(r=>[r.spend_date, esc(r.brand), esc(r.channel), fmt(r.cost), fmt(r.impressions), fmt(r.clicks), esc(r.memo||''), `<button class="btn sec sm" onclick="delSpend('${r.spend_date}','${esc(r.brand).replace(/'/g,"\\'")}','${esc(r.channel).replace(/'/g,"\\'")}')">삭제</button>`]), {left:[0,1,2,6], foot:['합계','','',fmt(tot),'','','','']});
 }
-async function delSpend(d,m){ if(!confirm(`${d} ${m} 광고비를 삭제할까요?`)) return; const {error}=await sb.from('ad_spend').delete().eq('spend_date',d).eq('media_std',m); if(error) return toast(sqlErr(error)); loadSpend(); }
-function downloadSpendTemplate(){ csvDownload('광고비_양식.csv', [['일자','매체','광고비','노출','클릭','메모'],['2026-10-01','사이트-KS오토플랜','1500000','120000','3400','']]); }
+async function delSpend(d,b,c){ if(!confirm(`${d} ${b} ${c} 광고비를 삭제할까요?`)) return; const {error}=await sb.from('ad_spend').delete().eq('spend_date',d).eq('brand',b).eq('channel',c); if(error) return toast(sqlErr(error)); loadSpend(); }
+const TPL_HEADERS=['일자','브랜드',...CHANNELS,'메모'];
+function downloadSpendTemplate(){
+  const m=$('#spTplMonth').value; if(!m) return toast('양식 월을 선택하세요');
+  const sel=msSel('msSpend'); if(!sel.length) return toast('브랜드를 하나 이상 선택하세요');
+  const y=+m.slice(0,4), mo=+m.slice(5,7); const days=new Date(y,mo,0).getDate();
+  const safe=b=>b.replace(/[\\/:*?"<>|]/g,'_');
+  const rowsFor = b => Array.from({length:days},(_,i)=>[`${y}-${String(mo).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`, b, ...CHANNELS.map(()=>''), '']);
+  if($('#spTplMode').value==='each'){ sel.forEach((b,k)=>setTimeout(()=>csvDownload(`광고비양식_${m}_${safe(b)}.csv`, [TPL_HEADERS, ...rowsFor(b)]), k*300)); }
+  else csvDownload(`광고비양식_${m}_${sel.length===1?safe(sel[0]):sel.length+'브랜드'}.csv`, [TPL_HEADERS, ...sel.flatMap(rowsFor)]);
+}
 async function uploadSpend(){
   const file=$('#spFile').files[0]; if(!file) return toast('파일을 선택하세요');
+  loading(true,'양식 읽는 중…',30);
   try{
     const rows=await readSheet(file); const h=rows[0].map(str); const ix=n=>h.indexOf(n);
-    if(ix('일자')<0||ix('매체')<0||ix('광고비')<0) throw new Error('헤더에 일자, 매체, 광고비 가 필요합니다');
-    const stds=new Set((await selectAll('media_map', q=>q.select('media_std'))).map(r=>r.media_std));
-    const out=[], unknown=new Set(), badDate=[];
+    if(ix('일자')<0||ix('브랜드')<0) throw new Error('헤더에 "일자", "브랜드" 가 필요합니다. 양식 다운로드로 받은 파일을 사용하세요.');
+    const chCols=CHANNELS.map(c=>[c,ix(c)]).filter(([c,i])=>i>=0); if(!chCols.length) throw new Error('광고채널 컬럼(네이버 파워링크 등)이 없습니다');
+    const known=new Set([...BRANDS, NO_BRAND]); const unknown=new Set(), badDate=[]; const mp=new Map();
     for(let i=1;i<rows.length;i++){ const r=rows[i]; if(!r||r.every(v=>v==null)) continue;
       const d=toDate(r[ix('일자')]); if(!d||d.bad){ badDate.push(i+1); continue; }
-      const m=str(r[ix('매체')]); if(!m) continue; if(!stds.has(m)) unknown.add(m);
-      out.push({spend_date:d, media_std:m, cost:toNum(r[ix('광고비')])?.bad!==undefined?0:(toNum(r[ix('광고비')])||0), impressions: ix('노출')>=0? (toNum(r[ix('노출')])?.bad!==undefined?null:toNum(r[ix('노출')])) : null, clicks: ix('클릭')>=0? (toNum(r[ix('클릭')])?.bad!==undefined?null:toNum(r[ix('클릭')])) : null, memo: ix('메모')>=0? str(r[ix('메모')]) : null, updated_at:new Date().toISOString()}); }
-    if(unknown.size && !confirm(`매체 마스터의 표준매체명과 일치하지 않는 매체 ${unknown.size}종이 있습니다:\n${[...unknown].slice(0,15).join('\n')}\n\n그대로 저장할까요? (집계에서 유입 DB와 연결되지 않습니다)`)) return;
-    // 같은 키 중복 제거(마지막 행 우선)
-    const mp=new Map(); out.forEach(o=>mp.set(o.spend_date+'|'+o.media_std,o)); const rows2=[...mp.values()];
-    for(let i=0;i<rows2.length;i+=500){ const {error}=await sb.from('ad_spend').upsert(rows2.slice(i,i+500),{onConflict:'spend_date,media_std'}); if(error) throw error; }
-    await sb.from('upload_batches').insert({kind:'ad_spend', filename:file.name, row_count:rows2.length, uploaded_by:user.email});
-    $('#spMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(rows2.length)}행 저장` + (badDate.length?` · 일자 해석 불가 ${badDate.length}행 건너뜀 (행 ${badDate.slice(0,10).join(', ')})`:'');
-    $('#spFile').value=''; loadSpend();
+      const b=str(r[ix('브랜드')]); if(!b) continue; if(!known.has(b)) unknown.add(b);
+      const memo= ix('메모')>=0? str(r[ix('메모')]) : null;
+      for(const [c,ci] of chCols){ const v=r[ci]; if(v==null||String(v).trim()==='') continue; const n=toNum(v); if(n==null||n.bad!==undefined) continue;
+        mp.set(d+'|'+b+'|'+c, {spend_date:d, brand:b, channel:c, cost:n, memo, updated_at:new Date().toISOString()}); } }
+    if(!mp.size) throw new Error('입력된 금액이 없습니다 (채널 칸이 모두 비어 있음)');
+    if(unknown.size && !confirm(`매체 마스터에 없는 브랜드 ${unknown.size}종: ${[...unknown].slice(0,10).join(', ')}\n그대로 저장할까요? (브랜드별 ROAS 에 연결되지 않습니다)`)) { loading(false); return; }
+    const arr=[...mp.values()]; loading(true,`저장 중… ${fmt(arr.length)}건`,70);
+    for(let i=0;i<arr.length;i+=500){ const {error}=await sb.from('ad_spend').upsert(arr.slice(i,i+500),{onConflict:'spend_date,brand,channel'}); if(error) throw error; }
+    await sb.from('upload_batches').insert({kind:'ad_spend', filename:file.name, row_count:arr.length, uploaded_by:user.email});
+    $('#spMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(arr.length)}건 저장 (브랜드 ${new Set(arr.map(x=>x.brand)).size}개 · ${new Set(arr.map(x=>x.spend_date)).size}일)` + (badDate.length?` · 일자 해석 불가 ${badDate.length}행 건너뜀 (행 ${badDate.slice(0,10).join(', ')})`:'');
+    $('#spFile').value=''; $('#spMonth').value=arr[0].spend_date.slice(0,7); loadSpend();
   }catch(e){ $('#spMsg').innerHTML='<span class="pill bad">실패</span> '+esc(sqlErr(e)); }
+  finally{ loading(false); }
 }
 
 /* ============================ 매핑 ============================ */
@@ -764,7 +808,7 @@ async function saveMediaMap(){
   const ups=[...mmDirtyKeys].map(k=>{ const g=f=>document.querySelector(`#tMediaMap [data-k="${CSS.escape(k)}"][data-f="${f}"]`)?.value; const std=(g('media_std')||'').trim()||k;
     return {media_raw:k, media_std:std, media_type:g('media_type'), platform:(g('platform')||'').trim()||null, brand:(g('brand')||'').trim()||null, memo:(g('memo')||'').trim()||null, updated_at:new Date().toISOString()}; });
   const {error}=await sb.from('media_map').upsert(ups,{onConflict:'media_raw'}); if(error) return toast(sqlErr(error));
-  mmDirtyKeys.clear(); toast(`${ups.length}건 저장`); loadMediaMap(); loadMediaStdList();
+  mmDirtyKeys.clear(); toast(`${ups.length}건 저장`); loadMediaMap(); loadBrandList();
 }
 async function loadCarMap(){
   try{
@@ -812,9 +856,15 @@ async function dl(kind){
     const rate=r=>{ const d=r[f.dbField]??r.db_count; return {...r, db_selected:d, dedup_rule:f.dbLabel, roas:r.cost?+(r.revenue/r.cost).toFixed(2):null, cpa_db:r.cost&&d?Math.round(r.cost/d):null, cpa_contract:r.cost&&r.contracts?Math.round(r.cost/r.contracts):null, conv_rate:d?+(100*r.contracts/d).toFixed(2):null}; };
     const brandFilter = rows => rows.filter(r=>!f.brands.length || f.brands.includes(brandOf(r)));
     const mp = async grain => brandFilter(await rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:grain,p_basis:f.basis}));
-    if(['media_month','media_week','media_day'].includes(kind)){ const g=kind.split('_')[1]; csvDownload(`매체x${{month:'월',week:'주',day:'일'}[g]}별_${tag}.csv`, objsToRows((await mp(g)).map(rate))); }
-    else if(kind==='media_total'){ csvDownload(`매체별합계_${tag}.csv`, objsToRows((await mp('all')).map(rate))); }
-    else if(kind==='brand_total'){ const M=await mp('all'); const by=groupBy(M, brandOf); const rows=[...by.entries()].map(([k,rs])=>{ const x=sumRows(rs,f); return rate({brand:k, db_count:x.db, net_db:x.net, ip_db:x.ipdb, both_db:x.both, contracts:x.contracts, revenue:x.revenue, car_price_sum:x.carprice, cost:x.cost, impressions:x.impressions, clicks:x.clicks}); }); csvDownload(`브랜드별합계_${tag}.csv`, objsToRows(rows)); }
+    const sp = async grain => (await rpc('fn_spend_period',{p_from:f.from,p_to:f.to,p_grain:grain})).filter(r=>!f.brands.length || f.brands.includes(r.brand));
+    const noCost=r=>{ const d=r[f.dbField]??r.db_count; return {...r, db_selected:d, dedup_rule:f.dbLabel, conv_rate:d?+(100*r.contracts/d).toFixed(2):null}; };
+    if(['media_month','media_week','media_day'].includes(kind)){ const g=kind.split('_')[1]; csvDownload(`매체x${{month:'월',week:'주',day:'일'}[g]}별_${tag}.csv`, objsToRows((await mp(g)).map(noCost))); }
+    else if(kind==='media_total'){ csvDownload(`매체별합계_${tag}.csv`, objsToRows((await mp('all')).map(noCost))); }
+    else if(kind==='brand_total' || kind==='brand_month'){ const g=kind==='brand_month'?'month':'all'; const [M,S]=await Promise.all([mp(g), sp(g)]);
+      const byM=groupBy(M, r=>r.period+'|'+brandOf(r)), byS=groupBy(S, r=>r.period+'|'+r.brand); const keys=[...new Set([...byM.keys(),...byS.keys()])].sort();
+      const rows=keys.map(k=>{ const [period,brand]=k.split('|'); const x=sumRows(byM.get(k)||[],f,byS.get(k)||[]); return rate({period: g==='all'?`${f.from}~${f.to}`:period, brand, db_count:x.db, net_db:x.net, ip_db:x.ipdb, both_db:x.both, contracts:x.contracts, revenue:x.revenue, car_price_sum:x.carprice, cost:x.cost, impressions:x.impressions, clicks:x.clicks}); });
+      csvDownload(`브랜드별${g==='month'?'_월별':'합계'}_${tag}.csv`, objsToRows(rows)); }
+    else if(kind==='spend_channel'){ const S=await sp('month'); csvDownload(`광고비_브랜드x채널_월별_${tag}.csv`, objsToRows(S)); }
     else if(kind==='car'){ const C=await rpc('fn_car_summary',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_limit:null,p_brands:bArg}); csvDownload(`차량별집계_${tag}.csv`, objsToRows(C.sort((x,y)=>y.db_count-x.db_count))); }
     else if(kind==='lead_media'){ csvDownload(`리드타임_매체별_${tag}.csv`, objsToRows(await rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'media',p_brands:bArg}))); }
     else if(kind==='lead_car'){ csvDownload(`리드타임_차량별_${tag}.csv`, objsToRows(await rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'car',p_brands:bArg}))); }
@@ -842,13 +892,13 @@ async function dlRaw(kind){
   const tag=`${f.from}_${f.to}`+(f.brands.length?`_${f.brands.length}브랜드`:'');
   loading(true,'원본 조회 준비 중…',5); $('#dlMsg').textContent='';
   try{
-    let medias=null; if(f.brands.length){ medias=await mediaRawsForBrands(f.brands); if(!medias.length) throw new Error('선택한 브랜드에 해당하는 매체가 없습니다'); }
+    let medias=null; if(f.brands.length && kind!=='ad_spend'){ medias=await mediaRawsForBrands(f.brands); if(!medias.length) throw new Error('선택한 브랜드에 해당하는 매체가 없습니다'); }
     const toEx=new Date(f.to+'T00:00:00'); toEx.setDate(toEx.getDate()+1); const toExS=toEx.toISOString().slice(0,10);
     let out=[], from=0, step=1000, total=null;
     const build=q=>{
       if(kind==='inquiry'){ q=q.gte('inq_date',f.from).lte('inq_date',f.to).order('inquired_at',{ascending:false}); if(medias) q=q.in('media',medias); }
       else if(kind==='sales'){ const dc=f.basis==='inquiry'?'inquiry_date':'contract_date'; q=q.gte(dc,f.from).lte(dc,f.to).order(dc,{ascending:false}).order('id'); if(medias) q=q.in('media',medias); }
-      else { q=q.gte('spend_date',f.from).lte('spend_date',f.to).order('spend_date',{ascending:false}).order('media_std'); if(medias){ q=q.in('media_std',[...new Set(medias)]); } }
+      else { q=q.gte('spend_date',f.from).lte('spend_date',f.to).order('spend_date',{ascending:false}).order('brand').order('channel'); if(f.brands.length) q=q.in('brand',f.brands); }
       return q; };
     const table = kind==='inquiry'?'inquiries': kind==='sales'?'v_sales':'ad_spend';
     for(;;){ let q=sb.from(table).select('*',{count: from===0?'exact':null}); q=build(q); const {data,error,count}=await q.range(from,from+step-1); if(error) throw error; if(count!=null) total=count; out=out.concat(data||[]); loading(true,`원본 내려받는 중… ${fmt(out.length)}${total?' / '+fmt(total):''}행`, total? Math.min(95, 5+90*out.length/total):50); if(!data||data.length<step) break; from+=step; }
@@ -856,7 +906,7 @@ async function dlRaw(kind){
     let rows;
     if(kind==='inquiry'){ const extra=[...new Set(out.flatMap(o=>Object.keys(o.raw||{})))].filter(k=>!INQ_HEADERS.includes(k)); rows=[[...INQ_HEADERS,...extra], ...out.map(o=>{ const base=rowToOriginal(o,INQ_HEADERS,INV_INQ).slice(0,INQ_HEADERS.length); return base.concat(extra.map(k=>(o.raw||{})[k]??'')); })]; }
     else if(kind==='sales'){ const extra=[...new Set(out.flatMap(o=>Object.keys(o.raw||{})))]; rows=[[...SALE_HEADERS,'배치#','배치활성','유입매체 매칭',...extra], ...out.map(o=>{ const base=rowToOriginal(o,SALE_HEADERS,INV_SALE).slice(0,SALE_HEADERS.length); return base.concat([o.batch_id, o.is_active?'Y':'N', o.media_matched?'Y':'N'], extra.map(k=>(o.raw||{})[k]??'')); })]; }
-    else { rows=[['일자','매체','광고비','노출','클릭','메모','수정일시'], ...out.map(o=>[o.spend_date,o.media_std,o.cost,o.impressions,o.clicks,o.memo,kst(o.updated_at)])]; }
+    else { rows=[['일자','브랜드','채널','광고비','노출','클릭','메모','수정일시'], ...out.map(o=>[o.spend_date,o.brand,o.channel,o.cost,o.impressions,o.clicks,o.memo,kst(o.updated_at)])]; }
     csvDownload(`${{inquiry:'유입raw',sales:'매출raw',ad_spend:'광고비raw'}[kind]}_${tag}.csv`, rows);
     $('#dlMsg').textContent=`다운로드 완료 (${fmt(out.length)}행)`;
   }catch(e){ $('#dlMsg').textContent='실패: '+sqlErr(e); }
