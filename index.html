@@ -275,23 +275,45 @@
 <!-- ================= 다운로드 ================= -->
 <section class="page" id="p-down">
   <div class="card">
-    <h2>집계 결과 다운로드 (CSV, 엑셀에서 바로 열림)</h2>
-    <div class="muted">대시보드의 현재 필터(기간·기준·매체유형)가 적용됩니다.</div>
-    <div class="row" style="margin-top:10px">
-      <button class="btn sec" onclick="dl('media_period')">매체 × 기간 집계</button>
+    <h2>다운로드 조건 <span class="muted">(대시보드와 별도로 여기서 기간·브랜드를 지정합니다)</span></h2>
+    <div class="row">
+      <div><label>시작일</label><input type="date" id="dFrom"></div>
+      <div><label>종료일</label><input type="date" id="dTo"></div>
+      <div><label>매출 기준일</label><select id="dBasis"><option value="contract">계약일자</option><option value="inquiry">문의일자</option></select></div>
+      <div><label>브랜드 (자사)</label><div class="ms" id="msDl"><button class="btn sec" type="button" onclick="this.parentNode.classList.toggle('open')">전체 브랜드 ▾</button><div class="pop"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msDl',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msDl',false)">전체 해제</button><span class="muted" style="margin-left:auto">해제 = 전체</span></div><div class="list"></div></div></div></div>
+      <div><label>집계의 중복 제외</label><div class="chk"><label><input type="checkbox" id="dDupCrm" checked>CRM 중복</label><label><input type="checkbox" id="dDupIp">IP 중복</label></div></div>
+    </div>
+    <div id="dlMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+  <div class="card">
+    <h2>집계 결과 (CSV, 엑셀에서 바로 열림)</h2>
+    <div class="row">
+      <button class="btn sec" onclick="dl('media_month')">매체 × 월별</button>
+      <button class="btn sec" onclick="dl('media_week')">매체 × 주별</button>
+      <button class="btn sec" onclick="dl('media_day')">매체 × 일별</button>
       <button class="btn sec" onclick="dl('media_total')">매체별 합계</button>
+      <button class="btn sec" onclick="dl('brand_total')">브랜드별 합계</button>
       <button class="btn sec" onclick="dl('car')">차량별 집계</button>
       <button class="btn sec" onclick="dl('lead_media')">리드타임 매체별</button>
       <button class="btn sec" onclick="dl('lead_car')">리드타임 차량별</button>
     </div>
-    <h3>원본·마스터</h3>
+  </div>
+  <div class="card">
+    <h2>원본(raw) 데이터 <span class="muted">· 업로드했던 원래 양식의 컬럼명으로 내려받습니다. 기간·브랜드 조건 적용. 유입은 문의일시, 매출은 위 "매출 기준일", 광고비는 일자 기준</span></h2>
     <div class="row">
+      <button class="btn sec" onclick="dlRaw('inquiry')">유입 문의 DB raw</button>
+      <button class="btn sec" onclick="dlRaw('sales')">매출 raw</button>
+      <button class="btn sec" onclick="dlRaw('ad_spend')">광고비 raw</button>
       <button class="btn sec" onclick="dl('unmatched')">미매칭 매출 (유입 매체에 없는 행)</button>
+    </div>
+    <div class="muted" style="margin-top:6px">유입 raw는 건수가 많으면(수만 건 이상) 1~3분 걸립니다. 고객명은 "저장 안 함"으로 올렸으면 비어 있고, 고객IP는 저장하지 않으므로 항상 비어 있습니다.</div>
+  </div>
+  <div class="card">
+    <h2>마스터</h2>
+    <div class="row">
       <button class="btn sec" onclick="dl('media_map')">매체 마스터</button>
       <button class="btn sec" onclick="dl('car_map')">차량 마스터</button>
-      <button class="btn sec" onclick="dl('ad_spend')">광고비 전체</button>
     </div>
-    <div id="dlMsg" class="muted" style="margin-top:8px"></div>
   </div>
 </section>
 
@@ -415,6 +437,7 @@ function afterLogin(u){
   const today=new Date(); const y=today.getFullYear();
   $('#fFrom').value=`${y}-01-01`; $('#fTo').value=today.toISOString().slice(0,10);
   $('#spDate').value=today.toISOString().slice(0,10); $('#spMonth').value=today.toISOString().slice(0,7);
+  $('#dFrom').value=`${y}-01-01`; $('#dTo').value=today.toISOString().slice(0,10);
   const t2=new Date(); t2.setDate(t2.getDate()-30); $('#lgFrom').value=t2.toISOString().slice(0,10); $('#lgTo').value=today.toISOString().slice(0,10);
   sb.from('admin_users').select('email').eq('email',u.email).then(({data})=>{ if(data&&data.length){ $('#navLog').style.display=''; } });
   loadDash(); loadBatches(); loadMediaStdList();
@@ -427,6 +450,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   if(b.dataset.p==='set'){ showStatus(); }
   if(b.dataset.p==='upload'){ loadBatches(); }
   if(b.dataset.p==='log'){ loadLog(); loadAdmins(); }
+  if(b.dataset.p==='down' && !document.querySelector('#msDl input')){ rpc('fn_data_status',{}).then(st=>{ if(st.brands){ BRANDS=st.brands; msFill('msDl',BRANDS); } }).catch(()=>{}); }
 });
 $('#upKind').onchange=()=>{ $('#piiBox').style.display = $('#upKind').value==='inquiry'?'':'none'; $('#upGo').disabled=true; $('#upPreview').innerHTML=''; };
 
@@ -511,7 +535,7 @@ async function loadDash(){
     const took=((Date.now()-t0)/1000).toFixed(1);
     const inc = r => f.types.includes(r.media_type) && (!f.brands.length || f.brands.includes(brandOf(r)));
     const Pf=P.filter(inc), Mf=M.filter(inc);
-    if(st.brands && JSON.stringify(st.brands)!==JSON.stringify(BRANDS)){ BRANDS=st.brands; const keep=msSel('msBrand'); msFill('msBrand',BRANDS); document.querySelectorAll('#msBrand input').forEach(i=>i.checked=keep.includes(i.value)); msLabel('msBrand'); msFill('msTrend',BRANDS,trendRefilter); }
+    if(st.brands && JSON.stringify(st.brands)!==JSON.stringify(BRANDS)){ BRANDS=st.brands; const keep=msSel('msBrand'); msFill('msBrand',BRANDS); document.querySelectorAll('#msBrand input').forEach(i=>i.checked=keep.includes(i.value)); msLabel('msBrand'); msFill('msTrend',BRANDS,trendRefilter); msFill('msDl',BRANDS); }
     DASH={f, P:Pf, M:Mf, C, L0, LM, LC, LB, LD, LMB, LPL};
     const unc = M.filter(r=>r.media_type==='미분류').length;
     $('#status').innerHTML = `<span class="pill ok">조회 완료 ${took}초</span>` + (f.brands.length?` <span class="pill">브랜드: ${esc(f.brands.join(', '))}</span>`:'') + ` 유입 ${fmt(st.inquiries)}건 (${(st.inquiry_min||'').slice(0,10)} ~ ${(st.inquiry_max||'').slice(0,10)}) · 활성 매출 ${fmt(st.sales_active)}건 (계약일 ${st.contract_min||'-'} ~ ${st.contract_max||'-'}) · 광고비 입력 ${fmt(st.ad_spend_days)}일 (최근 ${st.ad_spend_max||'-'})`
@@ -769,23 +793,74 @@ async function saveCarMap(){
 }
 
 /* ============================ 다운로드 ============================ */
-function csvDownload(name, rows){ const csv='\uFEFF'+rows.map(r=>r.map(v=>{ const s=v==null?'':String(v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(',')).join('\r\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download=name; a.click(); }
+function csvDownload(name, rows){ const csv='﻿'+rows.map(r=>r.map(v=>{ const s=v==null?'':String(v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(',')).join('\r\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download=name; a.click(); }
 function objsToRows(objs, cols){ cols=cols||[...new Set(objs.flatMap(o=>Object.keys(o)))]; return [cols, ...objs.map(o=>cols.map(c=>typeof o[c]==='object'&&o[c]!=null? JSON.stringify(o[c]) : o[c]))]; }
+function dlFilters(){
+  const sel=msSel('msDl'); const n=document.querySelectorAll('#msDl input').length; const brands=(sel.length===0||sel.length===n)?[]:sel;
+  const crm=$('#dDupCrm').checked, ip=$('#dDupIp').checked;
+  return { from:$('#dFrom').value, to:$('#dTo').value, basis:$('#dBasis').value, brands, dbField: crm&&ip?'both_db':crm?'net_db':ip?'ip_db':'db_count', dbLabel: crm&&ip?'CRM+IP 중복 제외':crm?'CRM 중복 제외':ip?'IP 중복 제외':'전체', types:['마케팅','내부','경비','미분류'] };
+}
+async function mediaRawsForBrands(brands){ // 브랜드 → 매체 원문 목록 (raw 필터용)
+  const rows=await selectAll('media_map', q=>q.select('media_raw,brand'));
+  return rows.filter(r=>brands.includes(r.brand||'(브랜드 없음)')).map(r=>r.media_raw);
+}
 async function dl(kind){
-  $('#dlMsg').textContent='준비 중…';
+  const f=dlFilters(); if(!f.from||!f.to) return toast('기간을 선택하세요');
+  const tag=`${f.from}_${f.to}`+(f.brands.length?`_${f.brands.length}브랜드`:''); const bArg=f.brands.length?f.brands:null;
+  $('#dlMsg').textContent='준비 중…'; loading(true,'집계 조회 중…',40);
   try{
-    const f=DASH.f||filters(); const tag=`${f.from}_${f.to}`; const rate=r=>{ const d=r[f.dbField]??r.db_count; return {...r, db_selected:d, dedup_rule:f.dbLabel, roas:r.cost?+(r.revenue/r.cost).toFixed(2):null, cpa_db:r.cost&&d?Math.round(r.cost/d):null, cpa_contract:r.cost&&r.contracts?Math.round(r.cost/r.contracts):null, conv_rate:d?+(100*r.contracts/d).toFixed(2):null}; };
-    if(kind==='media_period'){ if(!DASH.P) await loadDash(); csvDownload(`매체x기간_${f.grain}_${tag}.csv`, objsToRows(DASH.P.map(rate))); }
-    else if(kind==='media_total'){ if(!DASH.M) await loadDash(); csvDownload(`매체별합계_${tag}.csv`, objsToRows(DASH.M.map(rate))); }
-    else if(kind==='car'){ const C=await rpc('fn_car_summary',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_limit:null,p_brands:f.brands&&f.brands.length?f.brands:null}); csvDownload(`차량별집계_전체_${tag}.csv`, objsToRows(C.sort((x,y)=>y.db_count-x.db_count))); }
-    else if(kind==='lead_media'){ if(!DASH.LM) await loadDash(); csvDownload(`리드타임_매체별_${tag}.csv`, objsToRows(DASH.LM)); }
-    else if(kind==='lead_car'){ if(!DASH.LC) await loadDash(); csvDownload(`리드타임_차량별_${tag}.csv`, objsToRows(DASH.LC)); }
+    const rate=r=>{ const d=r[f.dbField]??r.db_count; return {...r, db_selected:d, dedup_rule:f.dbLabel, roas:r.cost?+(r.revenue/r.cost).toFixed(2):null, cpa_db:r.cost&&d?Math.round(r.cost/d):null, cpa_contract:r.cost&&r.contracts?Math.round(r.cost/r.contracts):null, conv_rate:d?+(100*r.contracts/d).toFixed(2):null}; };
+    const brandFilter = rows => rows.filter(r=>!f.brands.length || f.brands.includes(brandOf(r)));
+    const mp = async grain => brandFilter(await rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:grain,p_basis:f.basis}));
+    if(['media_month','media_week','media_day'].includes(kind)){ const g=kind.split('_')[1]; csvDownload(`매체x${{month:'월',week:'주',day:'일'}[g]}별_${tag}.csv`, objsToRows((await mp(g)).map(rate))); }
+    else if(kind==='media_total'){ csvDownload(`매체별합계_${tag}.csv`, objsToRows((await mp('all')).map(rate))); }
+    else if(kind==='brand_total'){ const M=await mp('all'); const by=groupBy(M, brandOf); const rows=[...by.entries()].map(([k,rs])=>{ const x=sumRows(rs,f); return rate({brand:k, db_count:x.db, net_db:x.net, ip_db:x.ipdb, both_db:x.both, contracts:x.contracts, revenue:x.revenue, car_price_sum:x.carprice, cost:x.cost, impressions:x.impressions, clicks:x.clicks}); }); csvDownload(`브랜드별합계_${tag}.csv`, objsToRows(rows)); }
+    else if(kind==='car'){ const C=await rpc('fn_car_summary',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_limit:null,p_brands:bArg}); csvDownload(`차량별집계_${tag}.csv`, objsToRows(C.sort((x,y)=>y.db_count-x.db_count))); }
+    else if(kind==='lead_media'){ csvDownload(`리드타임_매체별_${tag}.csv`, objsToRows(await rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'media',p_brands:bArg}))); }
+    else if(kind==='lead_car'){ csvDownload(`리드타임_차량별_${tag}.csv`, objsToRows(await rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'car',p_brands:bArg}))); }
     else if(kind==='unmatched'){ const rows=await selectAll('v_sales_unmatched'); csvDownload('미매칭매출.csv', objsToRows(rows)); }
     else if(kind==='media_map'){ const rows=await selectAll('v_media_counts'); csvDownload('매체마스터.csv', objsToRows(rows)); }
     else if(kind==='car_map'){ const rows=await selectAll('v_car_counts'); csvDownload('차량마스터.csv', objsToRows(rows)); }
-    else if(kind==='ad_spend'){ const rows=await selectAll('ad_spend', q=>q.order('spend_date')); csvDownload('광고비전체.csv', objsToRows(rows)); }
     $('#dlMsg').textContent='다운로드 완료';
   }catch(e){ $('#dlMsg').textContent='실패: '+sqlErr(e); }
+  finally{ loading(false); }
+}
+// 원본(raw) 다운로드 — 업로드 당시 한글 컬럼명으로 복원
+const INQ_HEADERS=['No.','문의번호','잠금/오픈','상태','문의일시','차량명','등급','트림','옵션','차량색상','내장색상','차량가','옵션가','이용방법','이용기간','연간주행거리','보험연령','선납금','보증금','월납입금','고객유형','알림유형','고객명','담당자명','담당자팀','할당그룹','할당타입','할당시간','중복여부','광고매체','신용도','등록일시','수정일시','고객IP','유입링크','유입키워드','utm_source','utm_medium','utm_campaign','utm_term','utm_content','utm_creative','utm_network',...INQ_CONSENT];
+const SALE_HEADERS=['No.','상태','등록일시','차량명','차량가격','옵션가격','계약마진','유입매체','유입링크','유입키워드','문의일자','계약일자'];
+const INV_INQ=Object.fromEntries(Object.entries(INQ_MAP).map(([k,v])=>[v,k])); const INV_SALE=Object.fromEntries(Object.entries(SALE_MAP).map(([k,v])=>[v,k]));
+function tsOut(v){ return v? kst(v)+(String(v).length>16? ':'+String(new Date(v).getSeconds()).padStart(2,'0'):'') : ''; }
+function rowToOriginal(o, headers, inv){
+  const byH={}; Object.entries(o).forEach(([c,v])=>{ const h=inv[c]; if(h) byH[h]=v; });
+  const raw=o.raw||{}, cons=o.consents||{};
+  return headers.map(h=>{ if(h==='고객명') return raw['고객명']??''; if(h==='고객IP') return ''; if(INQ_CONSENT.includes(h)) return cons[h]??'';
+    const v=byH[h]; const col=inv&&Object.keys(inv).find(k=>inv[k]===h); if(col&&TS_COLS.has(col)) return tsOut(v); return v??''; })
+    .concat(Object.keys(raw).filter(k=>!headers.includes(k)).map(k=>raw[k]));
+}
+async function dlRaw(kind){
+  const f=dlFilters(); if(!f.from||!f.to) return toast('기간을 선택하세요');
+  const tag=`${f.from}_${f.to}`+(f.brands.length?`_${f.brands.length}브랜드`:'');
+  loading(true,'원본 조회 준비 중…',5); $('#dlMsg').textContent='';
+  try{
+    let medias=null; if(f.brands.length){ medias=await mediaRawsForBrands(f.brands); if(!medias.length) throw new Error('선택한 브랜드에 해당하는 매체가 없습니다'); }
+    const toEx=new Date(f.to+'T00:00:00'); toEx.setDate(toEx.getDate()+1); const toExS=toEx.toISOString().slice(0,10);
+    let out=[], from=0, step=1000, total=null;
+    const build=q=>{
+      if(kind==='inquiry'){ q=q.gte('inq_date',f.from).lte('inq_date',f.to).order('inquired_at',{ascending:false}); if(medias) q=q.in('media',medias); }
+      else if(kind==='sales'){ const dc=f.basis==='inquiry'?'inquiry_date':'contract_date'; q=q.gte(dc,f.from).lte(dc,f.to).order(dc,{ascending:false}).order('id'); if(medias) q=q.in('media',medias); }
+      else { q=q.gte('spend_date',f.from).lte('spend_date',f.to).order('spend_date',{ascending:false}).order('media_std'); if(medias){ q=q.in('media_std',[...new Set(medias)]); } }
+      return q; };
+    const table = kind==='inquiry'?'inquiries': kind==='sales'?'v_sales':'ad_spend';
+    for(;;){ let q=sb.from(table).select('*',{count: from===0?'exact':null}); q=build(q); const {data,error,count}=await q.range(from,from+step-1); if(error) throw error; if(count!=null) total=count; out=out.concat(data||[]); loading(true,`원본 내려받는 중… ${fmt(out.length)}${total?' / '+fmt(total):''}행`, total? Math.min(95, 5+90*out.length/total):50); if(!data||data.length<step) break; from+=step; }
+    if(!out.length){ $('#dlMsg').textContent='조건에 맞는 행이 없습니다'; return; }
+    let rows;
+    if(kind==='inquiry'){ const extra=[...new Set(out.flatMap(o=>Object.keys(o.raw||{})))].filter(k=>!INQ_HEADERS.includes(k)); rows=[[...INQ_HEADERS,...extra], ...out.map(o=>{ const base=rowToOriginal(o,INQ_HEADERS,INV_INQ).slice(0,INQ_HEADERS.length); return base.concat(extra.map(k=>(o.raw||{})[k]??'')); })]; }
+    else if(kind==='sales'){ const extra=[...new Set(out.flatMap(o=>Object.keys(o.raw||{})))]; rows=[[...SALE_HEADERS,'배치#','배치활성','유입매체 매칭',...extra], ...out.map(o=>{ const base=rowToOriginal(o,SALE_HEADERS,INV_SALE).slice(0,SALE_HEADERS.length); return base.concat([o.batch_id, o.is_active?'Y':'N', o.media_matched?'Y':'N'], extra.map(k=>(o.raw||{})[k]??'')); })]; }
+    else { rows=[['일자','매체','광고비','노출','클릭','메모','수정일시'], ...out.map(o=>[o.spend_date,o.media_std,o.cost,o.impressions,o.clicks,o.memo,kst(o.updated_at)])]; }
+    csvDownload(`${{inquiry:'유입raw',sales:'매출raw',ad_spend:'광고비raw'}[kind]}_${tag}.csv`, rows);
+    $('#dlMsg').textContent=`다운로드 완료 (${fmt(out.length)}행)`;
+  }catch(e){ $('#dlMsg').textContent='실패: '+sqlErr(e); }
+  finally{ loading(false); }
 }
 
 /* ============================ 로그 (관리자) ============================ */
