@@ -6,7 +6,7 @@
 <title>마케팅 퍼포먼스 DB</title>
 <!-- ===================== 설정 =====================
      Supabase 프로젝트 > Settings > API 의 값을 아래 두 줄에 넣으세요.
-     (이 두 줄만 수정. 파일 맨 위에 따로 붙여넣지 마세요) -->
+     (비워두면 앱의 [설정] 탭에서 입력해 브라우저에 저장할 수 있습니다) -->
 <script>
   const SUPABASE_URL      = "https://qhlygfqetcfnoialihyc.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFobHlnZnFldGNmbm9pYWxpaHljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1NTA5MDAsImV4cCI6MjEwODEyNjkwMH0.gEMqPyGsJhsu1FbJBMB7q6nJRM-eLV4tm_QbomtZgJ8";
@@ -289,6 +289,7 @@
   </div>
   <div class="card">
     <h2>데이터 현황</h2>
+    <div class="row" style="margin-bottom:8px"><button class="btn sec" onclick="refreshAgg()">집계 갱신</button><span class="muted">유입 업로드 후 자동 실행됩니다. 대시보드 숫자가 업로드 내용과 다르면 눌러주세요.</span></div>
     <div id="setStatus" class="pre">-</div>
   </div>
 </section>
@@ -409,11 +410,13 @@ async function loadDash(){
   const f=filters(); if(!f.from||!f.to) return toast('기간을 선택하세요');
   $('#status').textContent='조회 중…';
   try{
-    const [st, P, M, C, L0, LM, LC, LB, LD] = await Promise.all([
-      rpc('fn_data_status',{}),
+    const st = await rpc('fn_data_status',{});
+    if(st.inquiries>0 && !(st.agg_rows>0)){ $('#status').innerHTML='<span class="pill warn">집계 테이블이 비어 있습니다</span> 집계 갱신 중… (최초 1회, 10~30초)'; await rpc('fn_refresh_agg',{}); }
+    const [P, M, C] = await Promise.all([
       rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:f.basis}),
       rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:'all',p_basis:f.basis}),
-      rpc('fn_car_summary',{p_from:f.from,p_to:f.to,p_basis:f.basis}),
+      rpc('fn_car_summary',{p_from:f.from,p_to:f.to,p_basis:f.basis})]);
+    const [L0, LM, LC, LB, LD] = await Promise.all([
       rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'all'}),
       rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'media'}),
       rpc('fn_leadtime',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:'car'}),
@@ -427,7 +430,8 @@ async function loadDash(){
     $('#status').innerHTML = `유입 ${fmt(st.inquiries)}건 (${(st.inquiry_min||'').slice(0,10)} ~ ${(st.inquiry_max||'').slice(0,10)}) · 활성 매출 ${fmt(st.sales_active)}건 (계약일 ${st.contract_min||'-'} ~ ${st.contract_max||'-'}) · 광고비 입력 ${fmt(st.ad_spend_days)}일 (최근 ${st.ad_spend_max||'-'})`
       + (st.sales_unmatched? ` · <span class="pill warn">미매칭 매출 ${fmt(st.sales_unmatched)}건 (유입 매체에 없음, 집계 제외)</span>`:'')
       + (st.media_unclassified? ` · <span class="pill warn">미분류 매체 ${fmt(st.media_unclassified)}종</span>`:'')
-      + (st.car_unmapped? ` · <span class="pill">브랜드 미지정 차량명 ${fmt(st.car_unmapped)}종</span>`:'');
+      + (st.car_unmapped? ` · <span class="pill">브랜드 미지정 차량명 ${fmt(st.car_unmapped)}종</span>`:'')
+      + (st.agg_refreshed_at? ` · <span class="muted">집계 갱신 ${String(st.agg_refreshed_at).slice(0,16).replace('T',' ')}</span>`:'');
 
     // KPI
     const s=sumRows(Mf,f); const lt=L0[0]||{};
@@ -571,6 +575,8 @@ async function doUpload(){
       done+=chunk.length; bar.style.width=(100*done/rows.length).toFixed(1)+'%'; $('#upMsg').textContent=`업로드 중… ${fmt(done)} / ${fmt(rows.length)}`;
     }
     await sb.from('upload_batches').update({row_count:done}).eq('id',b.id);
+    $('#upMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(done)}행 저장 (배치 #${b.id}) · 집계 갱신 중…`;
+    if(kind==='inquiry'){ try{ await rpc('fn_refresh_agg',{}); }catch(e){ toast('집계 갱신 실패: '+sqlErr(e)+' — 설정 탭에서 [집계 갱신]을 다시 눌러주세요', 6000); } }
     $('#upMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(done)}행 저장 (배치 #${b.id})`; toast('업로드 완료'); UP=null; $('#upFile').value=''; loadBatches();
   }catch(e){ $('#upMsg').innerHTML='<span class="pill bad">업로드 중단</span> '+esc(sqlErr(e))+' — 이미 저장된 행은 유지됩니다. 같은 파일을 다시 검증·업로드하면 유입은 갱신, 매출은 새 배치로 들어가므로 실패한 배치는 비활성화하세요.'; $('#upGo').disabled=false; }
 }
@@ -694,6 +700,7 @@ async function dl(kind){
 }
 
 /* ============================ 설정 ============================ */
+async function refreshAgg(){ toast('집계 갱신 중…',8000); try{ const r=await rpc('fn_refresh_agg',{}); toast(`집계 갱신 완료 (${fmt(r.media_rows)}행)`); showStatus(); }catch(e){ toast('실패: '+sqlErr(e),6000); } }
 async function showStatus(){ try{ const st=await rpc('fn_data_status',{}); $('#setStatus').textContent=JSON.stringify(st,null,2); }catch(e){ $('#setStatus').textContent=sqlErr(e); } }
 
 init();
