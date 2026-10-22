@@ -167,7 +167,7 @@
     <div class="tw" style="margin-top:10px"><table id="tTrend"></table></div>
   </div>
 
-  <div class="card"><h2>브랜드별 요약 <span class="muted">(매체 마스터의 브랜드 기준 · 광고비·ROAS·CPA는 브랜드 단위로 집계)</span></h2><div class="tw"><table id="tBrand"></table></div>
+  <div class="card"><h2>브랜드별 요약 <span class="muted">(매체 마스터의 브랜드 기준 · 브랜드가 없는 매체는 매체명 그대로 표시 · 광고비·ROAS·CPA는 브랜드 단위로 집계)</span></h2><div class="tw"><table id="tBrand"></table></div>
     <h3>브랜드 × 광고채널 광고비</h3><div class="tw"><table id="tSpendCh"></table></div></div>
   <div class="grid2">
     <div class="card"><h2>플랫폼별</h2><div class="tw"><table id="tPlatform"></table></div></div>
@@ -496,12 +496,12 @@ $('#upKind').onchange=()=>{ $('#piiBox').style.display = $('#upKind').value==='i
 /* ============================ 대시보드 ============================ */
 /* 다중선택(브랜드) */
 let BRANDS=[];
-function msFill(id, brands, onchange){ const el=$('#'+id); el.querySelector('.list').innerHTML=['(브랜드 없음)',...brands].map(b=>`<label><input type="checkbox" value="${esc(b)}">${esc(b)}</label>`).join(''); el.querySelectorAll('input').forEach(i=>i.onchange=()=>{ msLabel(id); onchange&&onchange(); }); msLabel(id); }
+function msFill(id, brands, onchange){ const el=$('#'+id); el.querySelector('.list').innerHTML=[...brands].map(b=>`<label><input type="checkbox" value="${esc(b)}">${esc(b)}</label>`).join(''); el.querySelectorAll('input').forEach(i=>i.onchange=()=>{ msLabel(id); onchange&&onchange(); }); msLabel(id); }
 function msSel(id){ return [...document.querySelectorAll('#'+id+' input:checked')].map(i=>i.value); }
 function msAll(id,on){ document.querySelectorAll('#'+id+' input').forEach(i=>i.checked=on); msLabel(id); const el=$('#'+id); if(id==='msTrend') trendRefilter(); }
 function msLabel(id){ const sel=msSel(id); const n=document.querySelectorAll('#'+id+' input').length; const b=document.querySelector('#'+id+'>button'); const pre = id==='msTrend'?'추이 브랜드: ':''; b.textContent = pre + (sel.length===0||sel.length===n ? '전체 브랜드' : sel.length===1 ? sel[0] : `${sel.length}개 브랜드`) + ' ▾'; }
 document.addEventListener('click', e=>{ document.querySelectorAll('.ms.open').forEach(m=>{ if(!m.contains(e.target)) m.classList.remove('open'); }); });
-function brandOf(r){ return r.brand || '(브랜드 없음)'; }
+function brandOf(r){ return r.brand || r.media_std || '(브랜드 없음)'; }   // 브랜드 미지정 매체는 매체명 그대로 표시
 function filters(){
   const types=[...document.querySelectorAll('#fTypes input:checked')].map(i=>i.value);
   const crm=$('#fDupCrm').checked, ip=$('#fDupIp').checked;
@@ -615,7 +615,7 @@ async function loadDash(){
 
     // 브랜드/플랫폼
     const bySB=groupBy(Sf, r=>r.brand);
-    const byB=groupBy(Mf, brandOf); const brandKeys=[...new Set([...byB.keys(), ...bySB.keys()])];
+    const byB=groupBy(Mf, brandOf); const brandKeys=[...new Set([...byB.keys(), ...bySB.keys()])];  // 브랜드 미지정 매체는 매체명으로 각각 표시
     const br=brandKeys.map(k=>({k,...sumRows(byB.get(k)||[],f,bySB.get(k)||[])})).sort((a,b)=>b.dbSel-a.dbSel);
     renderTable('tBrand', ['브랜드',...METRIC_H], br.map(x=>[esc(x.k),...metricCols(x)]), {foot:['합계',...metricCols(s)]});
     const chKeys=CHANNELS.filter(c=>Sf.some(r=>r.channel===c)).concat([...new Set(Sf.map(r=>r.channel))].filter(c=>!CHANNELS.includes(c)));
@@ -798,9 +798,9 @@ const TPL_COLS=[{h:'일자'},{h:'브랜드'}, ...CHANNELS.flatMap(c=> FEE_OF[c] 
 const ALL_CHANNELS=[...CHANNELS, ...Object.values(FEE_OF)];
 const NO_BRAND='(브랜드 없음)';
 async function loadBrandList(){ // 매체 마스터의 브랜드 목록
-  try{ const rows=await selectAll('media_map', q=>q.select('brand')); BRANDS=[...new Set(rows.map(r=>r.brand).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
-    const opts=['<option value="'+NO_BRAND+'">'+NO_BRAND+'</option>', ...BRANDS.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`)];
-    $('#spBrand').innerHTML=BRANDS.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('')+'<option value="'+NO_BRAND+'">'+NO_BRAND+'</option>';
+  try{ const rows=await selectAll('media_map', q=>q.select('brand,media_std')); BRANDS=[...new Set(rows.map(r=>r.brand||r.media_std).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+    const opts=BRANDS.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`);
+    $('#spBrand').innerHTML=opts.join('');
     $('#spListBrand').innerHTML='<option value="">전체</option>'+opts.join('');
     $('#spChannel').innerHTML=ALL_CHANNELS.map(c=>`<option>${c}</option>`).join('');
     if(!document.querySelector('#msSpend input')) msFill('msSpend',BRANDS);
@@ -944,8 +944,8 @@ function dlFilters(){
   return { from:$('#dFrom').value, to:$('#dTo').value, basis:$('#dBasis').value, brands, dbField: crm&&ip?'both_db':crm?'net_db':ip?'ip_db':'db_count', dbLabel: crm&&ip?'CRM+IP 중복 제외':crm?'CRM 중복 제외':ip?'IP 중복 제외':'전체', types:['마케팅','내부','경비','미분류'] };
 }
 async function mediaRawsForBrands(brands){ // 브랜드 → 매체 원문 목록 (raw 필터용)
-  const rows=await selectAll('media_map', q=>q.select('media_raw,brand'));
-  return rows.filter(r=>brands.includes(r.brand||'(브랜드 없음)')).map(r=>r.media_raw);
+  const rows=await selectAll('media_map', q=>q.select('media_raw,media_std,brand'));
+  return rows.filter(r=>brands.includes(r.brand||r.media_std||r.media_raw)).map(r=>r.media_raw);
 }
 async function dl(kind){
   const f=dlFilters(); if(!f.from||!f.to) return toast('기간을 선택하세요');
