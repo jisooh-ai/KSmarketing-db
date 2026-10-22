@@ -260,10 +260,11 @@
     <div class="row">
       <div><label>양식 월</label><input type="month" id="spTplMonth"></div>
       <div><label>브랜드 (단일·복수)</label><div class="ms" id="msSpend"><button class="btn sec" type="button" onclick="this.parentNode.classList.toggle('open')">브랜드 선택 ▾</button><div class="pop"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msSpend',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msSpend',false)">전체 해제</button></div><div class="list"></div></div></div></div>
+      <div><label>입력 단위</label><select id="spTplGrain"><option value="month">월별 (브랜드당 1행, 월 합계 입력)</option><option value="day">일별 (날짜마다 1행)</option></select></div>
       <div><label>파일 형태</label><select id="spTplMode"><option value="one">브랜드 모두 한 파일</option><option value="each">브랜드별 파일 각각</option></select></div>
       <div><button class="btn sec" onclick="downloadSpendTemplate()">양식 다운로드</button></div>
     </div>
-    <div class="muted" style="margin-top:6px">엑셀 양식 컬럼: <b>일자 · 브랜드 · 네이버 파워링크 · 네이버 GFA · 카카오 키워드 광고 · 카카오 모먼트 · 카카오 친구톡 · 구글 애즈 · <span style="background:#fff2cc">구글 애즈 수수료(15%)</span> · 메타 광고 · <span style="background:#fff2cc">메타 광고 수수료(15%)</span> · 틱톡 광고 · 당근 광고 · 블로그 인플루언서 · <span style="background:#fff2cc">블로그 인플루언서 수수료(15%)</span> · 유튜브 PPL · 기타 · 메모</b> — 선택한 브랜드와 해당 월의 날짜가 미리 채워져 있고, 채널 칸에 금액(원)만 적으면 됩니다. 노란 수수료 칸은 수식으로 자동 계산되고 잠겨 있어 직접 입력할 수 없습니다. 빈 칸은 건너뜁니다(0 으로 지우려면 0 입력). 업로드하면 수수료도 별도 채널("구글 애즈 수수료" 등)로 저장되어 광고비 합계에 포함됩니다.</div>
+    <div class="muted" style="margin-top:6px"><b>월별 양식</b>은 브랜드당 한 줄에 그 달의 합계를 넣는 방식이고(저장 시 해당 월 1일자로 기록되어 월 ROAS 계산에 그대로 쓰임), <b>일별 양식</b>은 날짜마다 한 줄입니다. 같은 달에 월별과 일별을 섞어 올리면 1일자에 합산되니 한 가지 방식만 쓰세요.<br>엑셀 양식 컬럼: <b>일자 · 브랜드 · 네이버 파워링크 · 네이버 GFA · 카카오 키워드 광고 · 카카오 모먼트 · 카카오 친구톡 · 구글 애즈 · <span style="background:#fff2cc">구글 애즈 수수료(15%)</span> · 메타 광고 · <span style="background:#fff2cc">메타 광고 수수료(15%)</span> · 틱톡 광고 · 당근 광고 · 블로그 인플루언서 · <span style="background:#fff2cc">블로그 인플루언서 수수료(15%)</span> · 유튜브 PPL · 기타 · 메모</b> — 선택한 브랜드와 해당 월의 날짜가 미리 채워져 있고, 채널 칸에 금액(원)만 적으면 됩니다. 노란 수수료 칸은 수식으로 자동 계산되고 잠겨 있어 직접 입력할 수 없습니다. 빈 칸은 건너뜁니다(0 으로 지우려면 0 입력). 업로드하면 수수료도 별도 채널("구글 애즈 수수료" 등)로 저장되어 광고비 합계에 포함됩니다.</div>
     <div class="row" style="margin-top:10px">
       <div><label>채운 양식 (.xlsx)</label><input type="file" id="spFile" accept=".xlsx,.xls,.csv"></div>
       <div><button class="btn" onclick="uploadSpend()">업로드</button></div>
@@ -820,19 +821,20 @@ async function loadSpend(){
 async function delSpend(d,b,c){ if(!confirm(`${d} ${b} ${c} 광고비를 삭제할까요?`)) return; const {error}=await sb.from('ad_spend').delete().eq('spend_date',d).eq('brand',b).eq('channel',c); if(error) return toast(sqlErr(error)); loadSpend(); }
 function loadScript(src){ return new Promise((res,rej)=>{ if(document.querySelector(`script[src="${src}"]`)) return res(); const el=document.createElement('script'); el.src=src; el.onload=res; el.onerror=()=>rej(new Error('스크립트 로드 실패: '+src)); document.head.appendChild(el); }); }
 const colLetter=n=>{ let s=''; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; };
-async function buildSpendTemplate(m, brands){
+async function buildSpendTemplate(m, brands, grain='day'){
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js');
   const y=+m.slice(0,4), mo=+m.slice(5,7); const days=new Date(y,mo,0).getDate();
   const wb=new ExcelJS.Workbook(); const ws=wb.addWorksheet('광고비', {views:[{state:'frozen', xSplit:2, ySplit:2}]});
   const feeIdx=TPL_COLS.map((c,i)=>c.feeOf? i : -1).filter(i=>i>=0);
   // 1행 안내, 2행 헤더
-  ws.addRow([`광고비 양식 ${m} · 브랜드: ${brands.join(', ')} · 금액은 원 단위 숫자만 · 노란 칸(수수료 ${FEE_RATE*100}%)은 자동 계산되며 직접 입력하지 않습니다`]);
+  ws.addRow([`광고비 양식 ${m} (${grain==='month'?'월별 · 한 달 합계를 한 줄에 입력':'일별 · 날짜마다 입력'}) · 브랜드: ${brands.join(', ')} · 금액은 원 단위 숫자만 · 노란 칸(수수료 ${FEE_RATE*100}%)은 자동 계산되며 직접 입력하지 않습니다`]);
   ws.mergeCells(1,1,1,TPL_COLS.length); ws.getRow(1).font={italic:true, color:{argb:'FF5B6470'}, size:10};
-  const hdr=ws.addRow(TPL_COLS.map(c=>c.h)); hdr.font={bold:true}; hdr.alignment={horizontal:'center', vertical:'middle', wrapText:true}; hdr.height=30;
+  const hdr=ws.addRow(TPL_COLS.map(c=> (grain==='month'&&c.h==='일자')? '월' : c.h)); hdr.font={bold:true}; hdr.alignment={horizontal:'center', vertical:'middle', wrapText:true}; hdr.height=30;
   hdr.eachCell((cell,ci)=>{ cell.fill={type:'pattern', pattern:'solid', fgColor:{argb: feeIdx.includes(ci-1)?'FFF4B183':'FFE7ECF3'}}; cell.border={bottom:{style:'thin'}}; });
   let r=3;
-  for(const b of brands){ for(let d=1; d<=days; d++){
-    const row=ws.addRow(TPL_COLS.map(c=> c.h==='일자'? `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}` : c.h==='브랜드'? b : null));
+  const dayList = grain==='month' ? [1] : Array.from({length:days},(_,i)=>i+1);
+  for(const b of brands){ for(const d of dayList){
+    const row=ws.addRow(TPL_COLS.map(c=> c.h==='일자'? (grain==='month'? `${y}-${String(mo).padStart(2,'0')}` : `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`) : c.h==='브랜드'? b : null));
     TPL_COLS.forEach((c,i)=>{ const cell=row.getCell(i+1);
       if(c.feeOf){ const src=colLetter(TPL_COLS.findIndex(x=>x.ch===c.feeOf)+1)+r; cell.value={formula:`IF(${src}="","",ROUND(${src}*${FEE_RATE},0))`}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF2CC'}}; cell.protection={locked:true}; cell.numFmt='#,##0'; }
       else { cell.protection={locked:false}; if(c.ch) cell.numFmt='#,##0'; }
@@ -848,8 +850,9 @@ async function downloadSpendTemplate(){
   const safe=b=>b.replace(/[\\/:*?"<>|]/g,'_'); loading(true,'양식 만드는 중…',50);
   try{
     const save=(buf,name)=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download=name; a.click(); };
-    if($('#spTplMode').value==='each'){ for(const b of sel){ save(await buildSpendTemplate(m,[b]), `광고비양식_${m}_${safe(b)}.xlsx`); await new Promise(r=>setTimeout(r,400)); } }
-    else save(await buildSpendTemplate(m, sel), `광고비양식_${m}_${sel.length===1?safe(sel[0]):sel.length+'브랜드'}.xlsx`);
+    const g=$('#spTplGrain').value; const gl = g==='month'?'월별':'일별';
+    if($('#spTplMode').value==='each'){ for(const b of sel){ save(await buildSpendTemplate(m,[b],g), `광고비양식_${gl}_${m}_${safe(b)}.xlsx`); await new Promise(r=>setTimeout(r,400)); } }
+    else save(await buildSpendTemplate(m, sel, g), `광고비양식_${gl}_${m}_${sel.length===1?safe(sel[0]):sel.length+'브랜드'}.xlsx`);
   }catch(e){ toast('양식 생성 실패: '+sqlErr(e), 6000); }
   finally{ loading(false); }
 }
@@ -858,13 +861,15 @@ async function uploadSpend(){
   loading(true,'양식 읽는 중…',30);
   try{
     const rows=await readSheet(file); const h=rows[0].map(str); const ix=n=>h.indexOf(n);
-    if(ix('일자')<0||ix('브랜드')<0) throw new Error('헤더에 "일자", "브랜드" 가 필요합니다. 양식 다운로드로 받은 파일을 사용하세요.');
+    const dateCol = ix('일자')>=0 ? ix('일자') : ix('월');
+    if(dateCol<0||ix('브랜드')<0) throw new Error('헤더에 "일자"(또는 "월"), "브랜드" 가 필요합니다. 양식 다운로드로 받은 파일을 사용하세요.');
     const norm=x=>String(x||'').replace(/\s+/g,'').replace(/\(.*?\)/g,'');
     const chCols=[]; h.forEach((hh,i)=>{ if(!hh) return; const c=ALL_CHANNELS.find(c=>norm(c)===norm(hh)); if(c) chCols.push([c,i]); });
     if(!chCols.length) throw new Error('광고채널 컬럼(네이버 파워링크 등)이 없습니다');
     const known=new Set([...BRANDS, NO_BRAND]); const unknown=new Set(), badDate=[]; const mp=new Map();
     for(let i=1;i<rows.length;i++){ const r=rows[i]; if(!r||r.every(v=>v==null)) continue;
-      const d=toDate(r[ix('일자')]); if(!d||d.bad){ badDate.push(i+1); continue; }
+      let dv=r[dateCol]; if(dv instanceof Date) dv=fmtDateObj(dv); dv=str(dv); if(dv && /^\d{4}[-./]\d{1,2}$/.test(dv)) dv=dv.replace(/[./]/g,'-')+'-01';   // 월별 양식(YYYY-MM) → 1일
+      const d=toDate(dv); if(!d||d.bad){ badDate.push(i+1); continue; }
       const b=str(r[ix('브랜드')]); if(!b) continue; if(!known.has(b)) unknown.add(b);
       const memo= ix('메모')>=0? str(r[ix('메모')]) : null;
       for(const [c,ci] of chCols){ const v=r[ci]; if(v==null||String(v).trim()==='') continue; const n=toNum(v); if(n==null||n.bad!==undefined) continue;
