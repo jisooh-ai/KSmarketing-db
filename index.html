@@ -141,7 +141,7 @@
       <div><label>중복 제외</label><div class="chk" id="fDedup">
         <label title="CRM이 중복여부=Y로 표시한 문의 제외"><input type="checkbox" id="fDupCrm" checked>CRM 중복(중복여부=Y)</label>
         <label title="같은 IP로 7일 내 재문의 제외 (IP는 해시로만 저장)"><input type="checkbox" id="fDupIp">IP 중복(7일)</label></div></div>
-      <div><label>브랜드 (자사)</label><div class="ms" id="msBrand"><button class="btn sec" type="button" onclick="this.parentNode.classList.toggle('open')">전체 브랜드 ▾</button><div class="pop"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msBrand',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msBrand',false)">전체 해제</button><span class="muted" style="margin-left:auto">해제 = 전체</span></div><div class="list"></div></div></div></div>
+      <div><label>브랜드 (자사) <span class="muted">· 선택하면 전체 지표가 바로 바뀝니다</span></label><div class="ms" id="msBrand"><button class="btn sec" type="button" onclick="this.parentNode.classList.toggle('open')">전체 브랜드 ▾</button><div class="pop"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msBrand',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msBrand',false)">전체 해제</button><span class="muted" style="margin-left:auto">해제 = 전체</span></div><div class="list"></div></div></div></div>
       <div><label>매체유형 포함</label><div class="chk" id="fTypes">
         <label><input type="checkbox" value="마케팅" checked>마케팅</label>
         <label><input type="checkbox" value="미분류" checked>미분류</label>
@@ -496,11 +496,11 @@ $('#upKind').onchange=()=>{ $('#piiBox').style.display = $('#upKind').value==='i
 /* ============================ 대시보드 ============================ */
 /* 다중선택(브랜드) */
 let BRANDS=[];
-function msFill(id, brands, onchange){ const el=$('#'+id); el.querySelector('.list').innerHTML=[...brands].map(b=>`<label><input type="checkbox" value="${esc(b)}">${esc(b)}</label>`).join(''); el.querySelectorAll('input').forEach(i=>i.onchange=()=>{ msLabel(id); onchange&&onchange(); }); msLabel(id); }
+function msFill(id, brands, onchange){ const el=$('#'+id); el.querySelector('.list').innerHTML=[...brands].map(b=>`<label><input type="checkbox" value="${esc(b)}">${esc(b)}</label>`).join(''); el.querySelectorAll('input').forEach(i=>i.onchange=()=>{ msLabel(id); el._dirty=true; onchange&&onchange(); }); msLabel(id); }
 function msSel(id){ return [...document.querySelectorAll('#'+id+' input:checked')].map(i=>i.value); }
-function msAll(id,on){ document.querySelectorAll('#'+id+' input').forEach(i=>i.checked=on); msLabel(id); const el=$('#'+id); if(id==='msTrend') trendRefilter(); }
+function msAll(id,on){ document.querySelectorAll('#'+id+' input').forEach(i=>i.checked=on); msLabel(id); const el=$('#'+id); el._dirty=true; if(id==='msTrend') trendRefilter(); if(id==='msLead') leadReload(); }
 function msLabel(id){ const sel=msSel(id); const n=document.querySelectorAll('#'+id+' input').length; const b=document.querySelector('#'+id+'>button'); const pre = id==='msTrend'?'추이 브랜드: ':''; b.textContent = pre + (sel.length===0||sel.length===n ? '전체 브랜드' : sel.length===1 ? sel[0] : `${sel.length}개 브랜드`) + ' ▾'; }
-document.addEventListener('click', e=>{ document.querySelectorAll('.ms.open').forEach(m=>{ if(!m.contains(e.target)) m.classList.remove('open'); }); });
+document.addEventListener('click', e=>{ document.querySelectorAll('.ms.open').forEach(m=>{ if(!m.contains(e.target)){ m.classList.remove('open'); if(m.id==='msBrand' && m._dirty){ m._dirty=false; loadDash(); } } }); });
 function brandOf(r){ return r.brand || r.media_std || '(브랜드 없음)'; }   // 브랜드 미지정 매체는 매체명 그대로 표시
 function filters(){
   const types=[...document.querySelectorAll('#fTypes input:checked')].map(i=>i.value);
@@ -595,7 +595,7 @@ async function loadDash(){
     // KPI
     const s=sumRows(Mf,f,Sf); const lt=L0[0]||{};
     $('#kpis').innerHTML=[
-      ['광고비', won(s.cost), s.cost?'':'광고비 미입력 (광고비 탭)'],
+      ['광고비' + (f.brands.length? ` · ${f.brands.length===1? f.brands[0] : f.brands.length+'개 브랜드'}` : ' · 전체 브랜드'), won(s.cost), s.cost?'':'광고비 미입력 (광고비 탭)'],
       ['실행매출', won(s.revenue), `계약마진 합계 · 건당 ${won(s.contracts? s.revenue/s.contracts:null)}`],
       ['ROAS', s.cost? fmt(100*s.revenue/s.cost,1)+'%' : '-', ''],
       ['계약 수', fmt(s.contracts), ''],
