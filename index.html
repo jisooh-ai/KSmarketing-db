@@ -522,8 +522,8 @@ function sumRows(rows, f, spend){
 function metricColsNoCost(s){ return [fmt(s.db), fmt(s.dbSel), fmt(s.contracts), won(s.revenue), won(s.carprice), pct(s.contracts,s.dbSel)]; }
 const METRIC_H_NOCOST = ['DB(전체)','DB(제외후)','계약수','실행매출','차량가 합계','전환율'];
 // 열: DB(전체) | DB(제외후) | 계약 | 매출 | 마진 | 광고비 | ROAS | CPA(DB) | CPA(계약) | 전환율   ※ CPA·전환율은 제외후 DB 기준
-function metricCols(s){ return [fmt(s.db), fmt(s.dbSel), fmt(s.contracts), won(s.revenue), won(s.carprice), won(s.cost), s.cost?fmt(100*s.revenue/s.cost,1)+'%':'-', s.cost?won(s.cost/(s.contracts||NaN)):'-', s.cost?won(s.cost/(s.dbSel||NaN)):'-', pct(s.contracts,s.dbSel)]; }
-const METRIC_H = ['DB(전체)','DB(제외후)','계약수','실행매출','차량가 합계','광고비','ROAS','CPA(계약당)','CPL(DB당)','전환율'];
+function metricCols(s){ return [fmt(s.db), fmt(s.dbSel), fmt(s.contracts), won(s.revenue), won(s.carprice), won(s.cost), s.cost?fmt(100*s.revenue/s.cost,1)+'%':'-', s.cost?won(s.cost/(s.dbSel||NaN)):'-', s.cost?won(s.cost/(s.contracts||NaN)):'-', pct(s.contracts,s.dbSel)]; }
+const METRIC_H = ['DB(전체)','DB(제외후)','계약수','실행매출','차량가 합계','광고비','ROAS','CPA(DB당)','계약당 비용','전환율'];
 function groupBy(rows, keyFn){ const m=new Map(); rows.forEach(r=>{ const k=keyFn(r)??'(없음)'; if(!m.has(k)) m.set(k,[]); m.get(k).push(r); }); return m; }
 function renderTable(id, headers, rows, opts={}){
   const t=$('#'+id); const leftCols=opts.left||[0];
@@ -599,8 +599,8 @@ async function loadDash(){
       ['실행매출', won(s.revenue), `계약마진 합계 · 건당 ${won(s.contracts? s.revenue/s.contracts:null)}`],
       ['ROAS', s.cost? fmt(100*s.revenue/s.cost,1)+'%' : '-', ''],
       ['계약 수', fmt(s.contracts), ''],
-      ['계약당 비용 (CPA)', s.cost&&s.contracts? fmt(s.cost/s.contracts)+'원':'-', ''],
-      ['DB당 비용 (CPL)', s.cost&&s.dbSel? fmt(s.cost/s.dbSel)+'원':'-', `DB ${fmt(s.dbSel)}건 (${f.dbLabel})`],
+      ['CPA (DB당 비용)', s.cost&&s.dbSel? fmt(s.cost/s.dbSel)+'원':'-', `광고비 ÷ DB ${fmt(s.dbSel)}건 (${f.dbLabel})`],
+      ['계약당 비용', s.cost&&s.contracts? fmt(s.cost/s.contracts)+'원':'-', `광고비 ÷ 계약 ${fmt(s.contracts)}건`],
       ['문의→계약 전환율', pct(s.contracts,s.dbSel), `계약 ${fmt(s.contracts)} ÷ DB ${fmt(s.dbSel)}`],
     ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
 
@@ -959,7 +959,7 @@ async function dl(kind){
   const tag=`${f.from}_${f.to}`+(f.brands.length?`_${f.brands.length}브랜드`:''); const bArg=f.brands.length?f.brands:null;
   $('#dlMsg').textContent='준비 중…'; loading(true,'집계 조회 중…',40);
   try{
-    const rate=r=>{ const d=r[f.dbField]??r.db_count; return {...r, db_selected:d, dedup_rule:f.dbLabel, roas_pct:r.cost?+(100*r.revenue/r.cost).toFixed(1):null, cpa_contract:r.cost&&r.contracts?Math.round(r.cost/r.contracts):null, cpl_db:r.cost&&d?Math.round(r.cost/d):null, conv_rate:d?+(100*r.contracts/d).toFixed(2):null}; };
+    const rate=r=>{ const d=r[f.dbField]??r.db_count; return {...r, db_selected:d, dedup_rule:f.dbLabel, roas_pct:r.cost?+(100*r.revenue/r.cost).toFixed(1):null, cpa_db:r.cost&&d?Math.round(r.cost/d):null, cost_per_contract:r.cost&&r.contracts?Math.round(r.cost/r.contracts):null, conv_rate:d?+(100*r.contracts/d).toFixed(2):null}; };
     const brandFilter = rows => rows.filter(r=>!f.brands.length || f.brands.includes(brandOf(r)));
     const mp = async grain => brandFilter(await rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:grain,p_basis:f.basis}));
     const sp = async grain => (await rpc('fn_spend_period',{p_from:f.from,p_to:f.to,p_grain:grain})).filter(r=>!f.brands.length || f.brands.includes(r.brand));
