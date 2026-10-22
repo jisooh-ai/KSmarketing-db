@@ -860,19 +860,26 @@ async function uploadSpend(){
   const file=$('#spFile').files[0]; if(!file) return toast('파일을 선택하세요');
   loading(true,'양식 읽는 중…',30);
   try{
-    const rows=await readSheet(file); const h=rows[0].map(str); const ix=n=>h.indexOf(n);
+    const rows=await readSheet(file);
+    // 헤더 행 찾기 (양식 1행은 안내문이므로 '브랜드'와 '일자'/'월'이 함께 있는 행을 헤더로)
+    let hi=rows.findIndex(r=>r&&r.some(v=>str(v)==='브랜드')&&r.some(v=>['일자','월'].includes(str(v)))); if(hi<0) hi=0;
+    const h=rows[hi].map(str); const ix=n=>h.indexOf(n);
     const dateCol = ix('일자')>=0 ? ix('일자') : ix('월');
     if(dateCol<0||ix('브랜드')<0) throw new Error('헤더에 "일자"(또는 "월"), "브랜드" 가 필요합니다. 양식 다운로드로 받은 파일을 사용하세요.');
     const norm=x=>String(x||'').replace(/\s+/g,'').replace(/\(.*?\)/g,'');
     const chCols=[]; h.forEach((hh,i)=>{ if(!hh) return; const c=ALL_CHANNELS.find(c=>norm(c)===norm(hh)); if(c) chCols.push([c,i]); });
     if(!chCols.length) throw new Error('광고채널 컬럼(네이버 파워링크 등)이 없습니다');
     const known=new Set([...BRANDS, NO_BRAND]); const unknown=new Set(), badDate=[]; const mp=new Map();
-    for(let i=1;i<rows.length;i++){ const r=rows[i]; if(!r||r.every(v=>v==null)) continue;
+    for(let i=hi+1;i<rows.length;i++){ const r=rows[i]; if(!r||r.every(v=>v==null)) continue;
       let dv=r[dateCol]; if(dv instanceof Date) dv=fmtDateObj(dv); dv=str(dv); if(dv && /^\d{4}[-./]\d{1,2}$/.test(dv)) dv=dv.replace(/[./]/g,'-')+'-01';   // 월별 양식(YYYY-MM) → 1일
       const d=toDate(dv); if(!d||d.bad){ badDate.push(i+1); continue; }
       const b=str(r[ix('브랜드')]); if(!b) continue; if(!known.has(b)) unknown.add(b);
       const memo= ix('메모')>=0? str(r[ix('메모')]) : null;
-      for(const [c,ci] of chCols){ const v=r[ci]; if(v==null||String(v).trim()==='') continue; const n=toNum(v); if(n==null||n.bad!==undefined) continue;
+      for(const [c,ci] of chCols){ let v=r[ci];
+        const baseOf=Object.keys(FEE_OF).find(k=>FEE_OF[k]===c);
+        if(baseOf && (v==null||String(v).trim()===''||String(v).startsWith('='))){ // 수수료 칸이 비었거나 수식 그대로면 기준 금액의 15% 로 계산
+          const bi=chCols.find(([cc])=>cc===baseOf)?.[1]; const bv= bi!=null? toNum(r[bi]) : null; v = (bv!=null && bv.bad===undefined)? Math.round(bv*FEE_RATE) : null; }
+        if(v==null||String(v).trim()==='') continue; const n=toNum(v); if(n==null||n.bad!==undefined) continue;
         mp.set(d+'|'+b+'|'+c, {spend_date:d, brand:b, channel:c, cost:n, memo, updated_at:new Date().toISOString()}); } }
     if(!mp.size) throw new Error('입력된 금액이 없습니다 (채널 칸이 모두 비어 있음)');
     if(unknown.size && !confirm(`매체 마스터에 없는 브랜드 ${unknown.size}종: ${[...unknown].slice(0,10).join(', ')}\n그대로 저장할까요? (브랜드별 ROAS 에 연결되지 않습니다)`)) { loading(false); return; }
