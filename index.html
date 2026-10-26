@@ -96,7 +96,7 @@
     <h2>마케팅 퍼포먼스 DB</h2>
     <div id="cfgBox" style="display:none" class="muted">접속 정보가 설정되지 않았습니다. <code>index.html</code> 상단의 <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code>에 값을 넣어 다시 배포하세요.</div>
     <div id="loginBox">
-      <div class="row" style="margin:8px 0"><div style="flex:1"><label>이메일</label><input id="email" type="email" autocomplete="username"></div></div>
+      <div class="row" style="margin:8px 0"><div style="flex:1"><label>이메일 또는 아이디</label><input id="email" type="text" autocomplete="username"></div></div>
       <div class="row" style="margin:8px 0"><div style="flex:1"><label>비밀번호</label><input id="pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()"></div></div>
       <div class="row"><button class="btn" onclick="login()">로그인</button><button class="btn sec" onclick="forgotPw()">비밀번호 찾기</button></div>
       <div id="loginMsg" class="muted" style="margin-top:8px"></div>
@@ -362,7 +362,7 @@
     <div class="muted">로그인: <span id="setEmail"></span> · 접속: <span id="setUrlView"></span></div>
     <h3>비밀번호 변경</h3>
     <div class="row">
-      <div><label>새 비밀번호 (8자 이상)</label><input id="cpw1" type="password" autocomplete="new-password"></div>
+      <div><label>새 비밀번호 (4자 이상)</label><input id="cpw1" type="password" autocomplete="new-password"></div>
       <div><label>새 비밀번호 확인</label><input id="cpw2" type="password" autocomplete="new-password"></div>
       <div><button class="btn" onclick="changePw()">변경</button></div>
     </div>
@@ -443,15 +443,23 @@ async function init(){
   if(session && !recovering) afterLogin(session.user);
 }
 function showRecover(){ $('#loginBox').style.display='none'; $('#recoverBox').style.display='block'; $('#login').style.display='flex'; }
+// 아이디(이메일 아님)·짧은 비밀번호 계정 지원: 앱이 Supabase 형식으로 변환해 로그인 (관리자가 같은 규칙으로 계정을 만들어 둠)
+async function sha256hex(t){ const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t.normalize('NFC'))); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+async function aliasEmail(id){ return `id-${(await sha256hex(id)).slice(0,20)}@id.ksautoplan.local`; }
+function fixPw(pw){ return pw.length<6 ? pw+'__ks' : pw; }
 async function login(){
   $('#loginMsg').textContent='로그인 중…';
-  const {data,error}=await sb.auth.signInWithPassword({email:$('#email').value.trim(), password:$('#pw').value});
+  let email=$('#email').value.trim(), pw=$('#pw').value; const isAlias=!email.includes('@');
+  if(isAlias) email=await aliasEmail(email); pw=fixPw(pw);
+  const {data,error}=await sb.auth.signInWithPassword({email, password:pw});
   if(error){ $('#loginMsg').textContent='로그인 실패: '+(/Invalid login credentials/i.test(error.message)?'이메일 또는 비밀번호가 올바르지 않습니다':sqlErr(error)); return; }
-  await logEvent('login','auth',{ua:navigator.userAgent.slice(0,120)});
+  await logEvent('login','auth',{ua:navigator.userAgent.slice(0,120), alias:isAlias?$('#email').value.trim():null});
+  if(isAlias) data.user.display=$('#email').value.trim();
   afterLogin(data.user);
 }
 async function forgotPw(){
   const email=$('#email').value.trim(); if(!email) return $('#loginMsg').textContent='이메일을 먼저 입력한 뒤 "비밀번호 찾기"를 누르세요';
+  if(!email.includes('@')) return $('#loginMsg').textContent='아이디 계정은 메일이 없어 비밀번호 찾기를 쓸 수 없습니다. 관리자에게 재설정을 요청하세요.';
   $('#loginMsg').textContent='메일 발송 중…';
   const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:SITE_URL});
   $('#loginMsg').textContent = error ? '발송 실패: '+sqlErr(error) : `${email} 로 재설정 링크를 보냈습니다. 메일의 링크를 열면 새 비밀번호를 설정할 수 있습니다 (스팸함도 확인).`;
@@ -465,13 +473,13 @@ async function setNewPw(){
 }
 async function changePw(){
   const p1=$('#cpw1').value, p2=$('#cpw2').value;
-  if(p1.length<8) return toast('8자 이상 입력하세요'); if(p1!==p2) return toast('두 비밀번호가 다릅니다');
-  const {error}=await sb.auth.updateUser({password:p1}); if(error) return toast('실패: '+sqlErr(error));
+  if(p1.length<4) return toast('4자 이상 입력하세요'); if(p1!==p2) return toast('두 비밀번호가 다릅니다');
+  const {error}=await sb.auth.updateUser({password:fixPw(p1)}); if(error) return toast('실패: '+sqlErr(error));
   await logEvent('password_change','auth'); $('#cpw1').value=''; $('#cpw2').value=''; toast('비밀번호가 변경되었습니다');
 }
 async function logout(){ await logEvent('logout','auth'); await sb.auth.signOut(); }
 function afterLogin(u){
-  user=u; $('#who').textContent=u.email; $('#setEmail').textContent=u.email; $('#login').style.display='none';
+  user=u; const shown=u.display||u.email; $('#who').textContent=shown; $('#setEmail').textContent=shown; $('#login').style.display='none';
   const today=new Date(); const y=today.getFullYear();
   $('#fFrom').value=`${y}-01-01`; $('#fTo').value=today.toISOString().slice(0,10);
   $('#spDate').value=today.toISOString().slice(0,10); $('#spMonth').value=today.toISOString().slice(0,7);
