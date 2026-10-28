@@ -1038,7 +1038,8 @@ async function loadSpend(){
   let q=sb.from('ad_spend').select('*').gte('spend_date',from).lte('spend_date',to); const b=$('#spListBrand').value; if(b) q=q.eq('brand',b);
   const {data,error}=await q.order('spend_date',{ascending:false}).order('brand').order('channel').limit(5000); if(error) return toast(sqlErr(error));
   const tot=data.reduce((a,r)=>a+ +r.cost,0);
-  renderTable('tSpend', ['일자','브랜드','채널','광고비','노출','클릭','메모',''], data.map(r=>[r.spend_date, esc(r.brand), esc(r.channel), fmt(r.cost), fmt(r.impressions), fmt(r.clicks), esc(r.memo||''), `<button class="btn sec sm" onclick="delSpend('${r.spend_date}','${esc(r.brand).replace(/'/g,"\\'")}','${esc(r.channel).replace(/'/g,"\\'")}')">삭제</button>`]), {left:[0,1,2,6], foot:['합계','','',fmt(tot),'','','','']});
+  const srcPill=r=> r.source&&r.source!=='수기' ? `<span class="pill ok" title="인입 DB 원장에서 매체 API로 자동 수집 (${r.synced_at? r.synced_at.slice(0,16).replace('T',' '):''})">API</span>` : '<span class="muted">수기</span>';
+  renderTable('tSpend', ['일자','브랜드','채널','광고비','출처','노출','클릭','메모',''], data.map(r=>[r.spend_date, esc(r.brand), esc(r.channel), fmt(r.cost), srcPill(r), fmt(r.impressions), fmt(r.clicks), esc(r.memo||''), `<button class="btn sec sm" onclick="delSpend('${r.spend_date}','${esc(r.brand).replace(/'/g,"\\'")}','${esc(r.channel).replace(/'/g,"\\'")}')">삭제</button>`]), {left:[0,1,2,4,7], foot:['합계','','',fmt(tot),'','','','','']});
 }
 async function delSpend(d,b,c){ if(!confirm(`${d} ${b} ${c} 광고비를 삭제할까요?`)) return; const {error}=await sb.from('ad_spend').delete().eq('spend_date',d).eq('brand',b).eq('channel',c); if(error) return toast(sqlErr(error)); loadSpend(); }
 function loadScript(src){ return new Promise((res,rej)=>{ if(document.querySelector(`script[src="${src}"]`)) return res(); const el=document.createElement('script'); el.src=src; el.onload=res; el.onerror=()=>rej(new Error('스크립트 로드 실패: '+src)); document.head.appendChild(el); }); }
@@ -1105,7 +1106,12 @@ async function uploadSpend(){
         mp.set(d+'|'+b+'|'+c, {spend_date:d, brand:b, channel:c, cost:n, memo, updated_at:new Date().toISOString()}); } }
     if(!mp.size) throw new Error('입력된 금액이 없습니다 (채널 칸이 모두 비어 있음)');
     if(unknown.size && !confirm(`매체 마스터에 없는 브랜드 ${unknown.size}종: ${[...unknown].slice(0,10).join(', ')}\n그대로 저장할까요? (브랜드별 ROAS 에 연결되지 않습니다)`)) { loading(false); return; }
-    const arr=[...mp.values()]; loading(true,`저장 중… ${fmt(arr.length)}건`,70);
+    let arr=[...mp.values()]; loading(true,`저장 중… ${fmt(arr.length)}건`,70);
+    { // 매체 API 로 자동 수집된 행은 수기 값으로 덮어쓰지 않음
+      const ds=[...new Set(arr.map(x=>x.spend_date))].sort(); const {data:apiKeys}=await sb.from('v_spend_api_keys').select('*').gte('spend_date',ds[0]).lte('spend_date',ds[ds.length-1]);
+      const ak=new Set((apiKeys||[]).map(k=>k.spend_date+'|'+k.brand+'|'+k.channel)); const before=arr.length; arr=arr.filter(x=>!ak.has(x.spend_date+'|'+x.brand+'|'+x.channel));
+      if(before!==arr.length) toast(`API 자동 수집 행 ${fmt(before-arr.length)}건은 건너뜀 (수기 값으로 덮어쓰지 않음)`);
+      if(!arr.length){ $('#spMsg').innerHTML='<span class="pill warn">저장할 행 없음</span> 모두 API 수집 행입니다.'; loading(false); return; } }
     for(let i=0;i<arr.length;i+=500){ const {error}=await sb.from('ad_spend').upsert(arr.slice(i,i+500),{onConflict:'spend_date,brand,channel'}); if(error) throw error; }
     await sb.from('upload_batches').insert({kind:'ad_spend', filename:file.name, row_count:arr.length, uploaded_by:user.email});
     $('#spMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(arr.length)}건 저장 (브랜드 ${new Set(arr.map(x=>x.brand)).size}개 · ${new Set(arr.map(x=>x.spend_date)).size}일)` + (badDate.length?` · 일자 해석 불가 ${badDate.length}행 건너뜀 (행 ${badDate.slice(0,10).join(', ')})`:'');
