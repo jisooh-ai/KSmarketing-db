@@ -79,6 +79,14 @@
   .ins .it{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45}
   .ins .it.good{border-left-color:var(--ok)} .ins .it.bad{border-left-color:var(--bad)} .ins .it.warn{border-left-color:var(--warn)}
   .ins .it b{display:block;font-size:13px;margin-bottom:2px}
+  .ins .it>div{flex:1;min-width:0}
+  .ins .it .tg{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;margin-bottom:4px;background:#eef2ff;color:#3730a3}
+  .ins .it.good .tg{background:#dcfce7;color:#166534} .ins .it.bad .tg{background:#fee2e2;color:#991b1b} .ins .it.warn .tg{background:#fef3c7;color:#92400e}
+  .ins .it details.more{margin-top:4px} .ins .it details.more summary{cursor:pointer;color:var(--muted);font-size:12px;list-style:none;user-select:none}
+  .ins .it details.more summary::before{content:'▸ ';} .ins .it details.more[open] summary::before{content:'▾ ';}
+  .ins .it details.more>div{margin-top:4px;color:#374151}
+  .ins details.insmore{grid-column:1/-1} .ins details.insmore>summary{cursor:pointer;color:var(--accent);font-size:12px;font-weight:600;padding:4px 2px} .ins details.insmore>div{margin-top:8px}
+  .insbasis{font-size:12px;color:var(--muted);margin:4px 0 8px}
   .badge{display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:22px;padding:0 8px;border-radius:999px;color:#fff;font-size:11px;font-weight:700;margin-right:6px;flex:none;white-space:nowrap}
   .outl{font-size:10px;padding:0 5px;border-radius:999px;margin-left:4px;vertical-align:middle}
   .outl.hi{background:#e7f7ec;color:var(--ok)} .outl.lo{background:#fde8e8;color:var(--bad)}
@@ -219,7 +227,7 @@
       <span class="muted" id="leadMsg"></span></div>
     <div class="kpis" id="ltKpis"></div>
     <h3 style="margin-top:12px">해석과 제시점 <span class="tip" title="선택한 기간·매출 기준일·브랜드에 맞춰 리드타임 수치를 자동 해석합니다. 규칙 기반 문구이며 최종 판단은 담당자가 합니다">ⓘ</span></h3>
-    <div class="ins" id="ltInsights"></div>
+    <div class="insbasis" id="ltInsBasis"></div><div class="ins" id="ltInsights"></div>
     <div style="margin-top:12px"><h3>기간별 추이 <span class="muted">(중앙값·평균·25%/75% 는 일수, 막대는 계약 건수)</span></h3><canvas id="chLeadTrend" style="max-height:280px"></canvas>
       <div class="tw" style="margin-top:8px;max-height:260px"><table id="tLeadTrend"></table></div></div>
     <div class="grid2" style="margin-top:12px">
@@ -228,7 +236,7 @@
         <select id="ldVal" style="padding:3px 6px;font-size:12px;max-width:260px" onchange="renderLeadDist()"><option value="">전체</option></select></h3><div id="ldBars"></div></div>
       <div><h3>차량 브랜드별</h3><div class="tw"><table id="tLeadBrand"></table></div></div>
     </div>
-    <div style="margin-top:12px"><h3><span id="ldCmpTitle">자사 브랜드별 리드타임 분포 비교</span> <span class="muted">(구간 비중 100% 누적 · 정상 계약 30건 이상 · 건수 상위 15 · 라벨의 중앙값은 해당 구분의 계약 소요일 중앙값)</span></h3><canvas id="chLeadDist" style="max-height:460px"></canvas></div>
+    <div style="margin-top:12px"><h3><span id="ldCmpTitle">자사 브랜드별 리드타임 분포 비교</span> <span class="muted">(구간 비중 100% 누적 · 정상 계약 30건 이상 · 건수 상위 15 · 라벨의 중앙값은 해당 구분의 계약 소요일 중앙값)</span></h3><canvas id="chLeadDist" style="max-height:460px"></canvas><div id="ldCmpMsg" class="muted"></div></div>
     <div class="grid2" style="margin-top:12px">
       <div><h3>자사 브랜드별 (매체 마스터 브랜드)</h3><div class="tw"><table id="tLeadMBrand"></table></div></div>
       <div><h3>플랫폼별</h3><div class="tw"><table id="tLeadPlatform"></table></div></div>
@@ -738,16 +746,24 @@ async function ipMigrateLoop(pending){
   finally{ _ipLoop=false; }
 }
 /* 해석과 제시점 (규칙 기반) */
+// 해석 카드 공통: 우선순위 정렬(주의>점검>개선>참고), 상위 4개만 펼침, 나머지는 '더 보기', 근거는 접힘
+function insHTML(out, max=4){
+  const pr={bad:0,warn:1,good:2,'':3}, tg={bad:'▼ 주의',warn:'! 점검',good:'▲ 개선','':'참고'};
+  const o=[...out].sort((a,b)=>pr[a.cls]-pr[b.cls]);
+  const item=x=>`<div class="it ${x.cls}"><div><span class="tg">${tg[x.cls]}</span><b>${x.title}</b>${x.body?`<details class="more"><summary>근거 · 제안</summary><div>${x.body}</div></details>`:''}</div></div>`;
+  const top=o.slice(0,max), rest=o.slice(max);
+  return top.map(item).join('') + (rest.length? `<details class="insmore"><summary>그 외 ${rest.length}건 더 보기</summary><div class="ins">${rest.map(item).join('')}</div></details>` : '');
+}
 function renderInsights(ctx){
   const {f,s,mstat,cur,prev,br,brC,mr,mrBig,lt,LD,LB,st}=ctx; const out=[];
-  const add=(cls,title,body)=>out.push(`<div class="it ${cls}"><div><b>${title}</b>${body}</div></div>`);
+  const add=(cls,title,body)=>out.push({cls,title,body});
   const roas=x=>x.cost? 100*x.revenue/x.cost : null;
   if(!s.cost) add('warn','광고비 미입력', `선택 기간에 광고비가 없어 ROAS·CPA를 계산할 수 없습니다. 광고비 탭에서 월별 양식을 올리면 즉시 반영됩니다.`);
   if(cur&&prev){
     const r1=roas(cur), r0=roas(prev);
     if(r1!=null&&r0!=null){ const d=r1-r0; add(d>=0?'good':'bad', `ROAS ${d>=0?'개선':'하락'} (${prev.m} ${fmt(r0,0)}% → ${cur.m} ${fmt(r1,0)}%, ${d>=0?'+':''}${fmt(d,0)}%p)`, `광고비 ${won(prev.cost)}→${won(cur.cost)} (${fmt(100*(cur.cost-prev.cost)/prev.cost,0)}%), 실행매출 ${won(prev.revenue)}→${won(cur.revenue)}. ${cur.m===mstat[mstat.length-1].m?'최근 달은 계약 진행 중이라 2~4주 뒤 ROAS가 올라오는 것이 정상입니다.':''}`); }
     const c1=cur.cost&&cur.dbSel? cur.cost/cur.dbSel:null, c0=prev.cost&&prev.dbSel? prev.cost/prev.dbSel:null;
-    if(c1&&c0){ const d=100*(c1-c0)/c0; add(d<=0?'good':(d>15?'bad':'warn'), `CPA ${d<=0?'개선':'상승'} ${fmt(Math.abs(d),0)}% (${fmt(c0)}원 → ${fmt(c1)}원)`, d>15? `문의 1건당 비용이 크게 올랐습니다. 광고비 ${fmt(100*(cur.cost-prev.cost)/prev.cost,0)}% 변동 대비 DB ${fmt(100*(cur.dbSel-prev.dbSel)/prev.dbSel,0)}% 변동 — 매체 믹스·소재 점검 권장.` : `문의 획득 효율은 ${d<=0?'유지·개선':'소폭 변동'} 범위입니다.`); }
+    if(c1&&c0){ const d=100*(c1-c0)/c0; if(Math.abs(d)<3) add('', `CPA 안정 (${fmt(c0)}원 → ${fmt(c1)}원, ${d>=0?'+':''}${fmt(d,1)}%)`, '문의 1건당 비용이 전월 수준으로 유지됐습니다.'); else add(d<=0?'good':(d>15?'bad':'warn'), `CPA ${d<=0?'개선':'상승'} ${fmt(Math.abs(d),0)}% (${fmt(c0)}원 → ${fmt(c1)}원)`, d>15? `문의 1건당 비용이 크게 올랐습니다. 광고비 ${fmt(100*(cur.cost-prev.cost)/prev.cost,0)}% 변동 대비 DB ${fmt(100*(cur.dbSel-prev.dbSel)/prev.dbSel,0)}% 변동 — 매체 믹스·소재 점검 권장.` : `문의 획득 효율은 ${d<=0?'유지·개선':'소폭 변동'} 범위입니다.`); }
     const v1=cur.dbSel?100*cur.contracts/cur.dbSel:null, v0=prev.dbSel?100*prev.contracts/prev.dbSel:null;
     if(v1!=null&&v0!=null){ const d=v1-v0; add(Math.abs(d)<0.3?'':(d>0?'good':'bad'), `문의→계약 전환율 ${fmt(v0,1)}% → ${fmt(v1,1)}%`, Math.abs(d)<0.3? '전환율은 안정적입니다.' : d>0? '같은 문의로 더 많은 계약 — 영업 처리 효율이 좋아졌습니다.' : '문의 대비 계약이 줄었습니다. 최근 달이면 리드타임 영향, 아니면 접수 잔존·응대 지연을 확인하세요.'); }
   }
@@ -767,7 +783,7 @@ function renderInsights(ctx){
   if(st.media_unclassified) add('warn', `미분류 매체 ${fmt(st.media_unclassified)}종`, '매핑 탭에서 유형·브랜드를 지정하면 브랜드별 ROAS에 반영됩니다.');
   if(st.sales_unmatched) add('warn', `미매칭 매출 ${fmt(st.sales_unmatched)}건`, '유입 매체에 없는 매체명으로 들어온 매출이라 광고 성과에서 제외됩니다. 다운로드 탭에서 목록 확인.');
   if(!out.length) add('', '해석할 데이터가 부족합니다', '기간을 넓히거나 광고비를 입력하면 자동 판독이 생성됩니다.');
-  $('#insights').innerHTML=out.join('');
+  $('#insights').innerHTML=insHTML(out);
 }
 function leadSel(){ const sel=msSel('msLead'); const n=document.querySelectorAll('#msLead input').length; return (!sel.length||sel.length===n)? null : sel; }
 async function leadReload(){
@@ -832,22 +848,23 @@ function renderLeadDist(){
     + `<div class="muted" style="margin-top:6px">${note} · 누적 = 해당 구간까지 계약된 비율</div>`;
   const stats = dim==='media'? (DASH.LM||[]) : dim==='media_brand'? (DASH.LMB||[]) : dim==='platform'? (DASH.LPL||[]) : [];
   const med=k=>{ const s=stats.find(x=>(x.dim_value??'(플랫폼 미지정)')===k); return s? s.median_days : null; };
-  const cmp=groups.filter(x=>x.n>=30).slice(0,15);
+  let minN=30, cmp=groups.filter(x=>x.n>=minN).slice(0,15); if(!cmp.length){ minN=10; cmp=groups.filter(x=>x.n>=minN).slice(0,15); }
+  $('#ldCmpMsg').textContent = !groups.length ? '분포 데이터가 없습니다. 상단 [조회]를 다시 누르거나(서버 함수 갱신 직후) 기간·브랜드를 넓혀 보세요.' : !cmp.length ? `정상 계약 ${minN}건 이상인 ${dimLabel}이(가) 없어 비교 차트를 생략합니다.` : (minN<30? `정상 계약 30건 이상 항목이 없어 ${minN}건 기준으로 표시합니다.` : '');
+  $('#chLeadDist').style.display = cmp.length? '' : 'none';
   $('#ldCmpTitle').textContent=`${dimLabel}별 리드타임 분포 비교`;
   chart('chLeadDist',{type:'bar',data:{labels:cmp.map(x=>{ const m=med(x.k); return [x.k, `${fmt(x.n)}건${m!=null?` · 중앙값 ${fmt(m,0)}일`:''}`]; }),
       datasets:LD_BUCKETS.map((b,i)=>({label:b,data:cmp.map(x=>+(100*(x.b[b]||0)/x.n).toFixed(1)),backgroundColor:LD_COLS[i],stack:'s'}))},
     options:{indexAxis:'y',plugins:{legend:{position:'bottom'},tooltip:{callbacks:{title:items=>cmp[items[0].dataIndex].k, label:c=>`${c.dataset.label}: ${c.parsed.x}% (${fmt(cmp[c.dataIndex].b[c.dataset.label]||0)}건)`}}},scales:{x:{stacked:true,max:100,ticks:{callback:v=>v+'%'}},y:{stacked:true,ticks:{autoSkip:false,font:{size:11}}}}}});
 }
 function renderLeadInsights({lt, LT, LD, LB, LMB, LPL, grain, f}){
-  const out=[]; const add=(cls,title,body)=>out.push(`<div class="it ${cls}"><div><b>${title}</b>${body}</div></div>`);
+  const out=[]; const add=(cls,title,body)=>out.push({cls,title,body});
   const el=$('#ltInsights'); if(!el) return;
   if(!lt.n){ el.innerHTML='<div class="it warn"><div><strong>리드타임 데이터 없음</strong>선택 기간·브랜드에 정상 계약(문의일자·계약일자 모두 있는 건)이 없습니다.</div></div>'; return; }
   const basisInq = f.basis==='inquiry'; const brandSel = (leadSel()||(f.brands&&f.brands.length?f.brands:null));
   const gl = grain==='month'?'월':grain==='week'?'주':'일';
-  // ① 기준 안내
-  add('', `기준: ${basisInq?'문의일자':'계약일자'} ${f.from||''}~${f.to||''}${brandSel?` · 브랜드 ${brandSel.join(', ')}`:' · 전체 브랜드'}`,
-    basisInq ? `기간 안에 <u>문의</u>한 고객 중 계약까지 간 ${fmt(lt.n)}건의 소요일입니다. 최근 문의는 아직 계약 전인 건이 빠져 있어 <strong>마지막 ${gl}은 실제보다 짧게</strong> 보입니다. 응대 속도 비교는 완료된 ${gl} 기준으로 보세요.`
-             : `기간 안에 <u>계약</u>된 ${fmt(lt.n)}건이 문의 후 며칠 만에 계약됐는지입니다. 문의 시점은 기간 이전일 수 있으며, 최근 ${gl}도 잘림 없이 비교 가능합니다.`);
+  // ① 기준 안내 (패널 위 한 줄)
+  $('#ltInsBasis').innerHTML = `기준: <b>${basisInq?'문의일자':'계약일자'}</b> ${f.from||''}~${f.to||''} · ${brandSel?`브랜드 ${esc(brandSel.join(', '))}`:'전체 브랜드'} · 정상 계약 ${fmt(lt.n)}건` +
+    (basisInq ? ` · <span title="기간 안에 문의한 고객 중 계약까지 간 건만 포함. 최근 문의는 아직 계약 전인 건이 빠져 마지막 ${gl}은 실제보다 짧게 보임">⚠ 문의일자 기준은 마지막 ${gl}이 짧게 보임</span>` : '');
   // ② 대표값: 중앙값 vs 평균
   const tot=LD.filter(x=>!x.bucket.startsWith('제외')).reduce((a,x)=>a+x.n,0)||1; const share=b=>100*(LD.find(x=>x.bucket===b)?.n||0)/tot;
   const over30=share('31-60일')+share('61일+'), d0=share('0일');
@@ -887,7 +904,7 @@ function renderLeadInsights({lt, LT, LD, LB, LMB, LPL, grain, f}){
   }
   // ⑥ 장기 꼬리
   if(over30>=8) add('', `31일 이상 걸린 계약 ${fmt(over30,1)}%`, `한 달 넘게 고민한 뒤 계약한 고객이 ${fmt(tot*over30/100,0)}건입니다. 문의 후 2~4주 시점의 재접촉(견적 갱신·프로모션 안내)이 이 구간 전환을 앞당길 여지가 있습니다.`);
-  el.innerHTML=out.join('');
+  el.innerHTML=insHTML(out);
 }
 
 /* ============================ 업로드 ============================ */
