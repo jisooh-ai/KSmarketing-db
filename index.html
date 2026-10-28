@@ -73,6 +73,22 @@
   .ms .pop label{display:flex;gap:6px;align-items:center;padding:2px 2px;font-size:13px;color:var(--text)}
   .ms .pop .tools{display:flex;gap:6px;margin-bottom:6px;border-bottom:1px solid var(--line);padding-bottom:6px}
   .pre{font-family:ui-monospace,monospace;font-size:12px;background:#f8fafc;padding:8px;border-radius:6px;white-space:pre-wrap}
+  .kpi .d{font-size:12px;font-weight:700;margin-top:2px}
+  .up{color:var(--ok)} .down{color:var(--bad)} .flat{color:var(--muted)}
+  .ins{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+  .ins .it{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45}
+  .ins .it.good{border-left-color:var(--ok)} .ins .it.bad{border-left-color:var(--bad)} .ins .it.warn{border-left-color:var(--warn)}
+  .ins .it b{display:block;font-size:13px;margin-bottom:2px}
+  .badge{display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:22px;padding:0 8px;border-radius:999px;color:#fff;font-size:11px;font-weight:700;margin-right:6px;flex:none;white-space:nowrap}
+  .outl{font-size:10px;padding:0 5px;border-radius:999px;margin-left:4px;vertical-align:middle}
+  .outl.hi{background:#e7f7ec;color:var(--ok)} .outl.lo{background:#fde8e8;color:var(--bad)}
+  details.tbl{margin-top:8px} details.tbl summary{cursor:pointer;color:var(--muted);font-size:12px;user-select:none}
+  .tip{cursor:help;color:var(--muted);font-size:12px;margin-left:4px}
+  .carrow{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;border-bottom:1px solid var(--line)}
+  .carrow .nm{width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .carrow .cbar{flex:1;height:14px;background:#eef2f7;border-radius:7px;overflow:hidden;position:relative}
+  .carrow .cbar>div{height:100%;border-radius:7px}
+  .carrow .val{width:170px;text-align:right;color:var(--muted);font-size:12px;white-space:nowrap}
   .rpt-head{display:none}
   @media print{
     @page{size:A4 landscape;margin:10mm}
@@ -153,6 +169,10 @@
   </div>
 
   <div class="kpis" id="kpis"></div>
+  <div class="card" style="margin-top:14px">
+    <h2>해석과 제시점 <span class="tip" title="데이터 규칙에 따라 자동 생성된 판독입니다. 전월 대비 변화, 브랜드별 효율 편차, 이상치, 전환·리드타임 변화를 읽어 제안으로 정리합니다.">ⓘ</span></h2>
+    <div class="ins" id="insights"></div>
+  </div>
 
   <div class="card" style="margin-top:14px">
     <div class="row" style="align-items:center;margin-bottom:6px"><h2 style="margin:0">기간별 추이</h2>
@@ -163,23 +183,31 @@
         <label><input type="radio" name="grain" value="year">연별</label></div>
       <div class="ms" id="msTrend" style="margin-left:12px"><button class="btn sec sm" type="button" onclick="this.parentNode.classList.toggle('open')">추이 브랜드: 전체 ▾</button><div class="pop"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msTrend',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msTrend',false)">전체 해제</button></div><div class="list"></div></div></div>
       <span class="muted" id="trendMsg"></span></div>
-    <canvas id="chTrend"></canvas>
-    <div class="tw" style="margin-top:10px"><table id="tTrend"></table></div>
+    <div class="grid2">
+      <div><h3>광고비 · 실행매출 · ROAS</h3><canvas id="chTrend" style="max-height:300px"></canvas></div>
+      <div><h3>DB · 계약 · 전환율</h3><canvas id="chTrend2" style="max-height:300px"></canvas></div>
+    </div>
+    <details class="tbl"><summary>표로 보기</summary><div class="tw" style="margin-top:6px"><table id="tTrend"></table></div></details>
   </div>
 
-  <div class="card"><h2>브랜드별 요약 <span class="muted">(매체 마스터의 브랜드 기준 · 브랜드가 없는 매체는 매체명 그대로 표시 · 광고비·ROAS·CPA는 브랜드 단위로 집계)</span></h2><div class="tw"><table id="tBrand"></table></div>
-    <h3>브랜드 × 광고채널 광고비</h3><div class="tw"><table id="tSpendCh"></table></div></div>
+  <div class="card"><h2>브랜드별 요약 <span class="tip" title="매체 마스터의 브랜드 기준. 브랜드가 없는 매체는 매체명 그대로 표시. 광고비·ROAS·CPA는 브랜드 단위로 집계. 하단에 브랜드 평균·중앙값, 이상치는 ▲▼ 배지">ⓘ</span></h2><div class="tw"><table id="tBrand"></table></div>
+    <h3>브랜드 × 광고채널 광고비 구성비 <span class="tip" title="브랜드별 광고비를 100%로 놓고 채널 비중을 표시. 막대 끝 숫자는 광고비 합계. 광고비가 큰 브랜드 순">ⓘ</span></h3><canvas id="chSpendCh" style="max-height:360px"></canvas>
+    <details class="tbl"><summary>금액 표로 보기</summary><div class="tw" style="margin-top:6px"><table id="tSpendCh"></table></div></details></div>
   <div class="grid2">
     <div class="card"><h2>플랫폼별</h2><div class="tw"><table id="tPlatform"></table></div></div>
-    <div class="card"><h2>매체별 DB·계약 TOP 15</h2><canvas id="chMedia" style="max-height:420px"></canvas></div>
+    <div class="card"><h2>매체별 TOP 12 <span class="tip" title="왼쪽: DB수(중복 제외 기준), 오른쪽: 같은 매체의 문의→계약 전환율. 두 차트의 매체 순서는 동일">ⓘ</span></h2>
+      <div class="grid2"><div><h3>DB수</h3><canvas id="chMedia" style="max-height:400px"></canvas></div><div><h3>전환율 (%)</h3><canvas id="chMediaCv" style="max-height:400px"></canvas></div></div></div>
   </div>
-  <div class="card"><h2>매체별 성과 <span class="muted">(선택 기간 합계 · 리드타임은 정상 계약 기준 · 광고비는 브랜드 단위라 매체별 표에는 없음)</span></h2><div class="tw" style="max-height:560px"><table id="tMedia"></table></div></div>
+  <div class="card"><h2>매체별 성과 <span class="tip" title="선택 기간 합계. 리드타임은 정상 계약 기준. 광고비는 브랜드 단위라 매체별 표에는 없음. 전환율·리드타임 이상치는 ▲▼ 배지(IQR 기준)">ⓘ</span></h2><div class="tw" style="max-height:560px"><table id="tMedia"></table></div></div>
 
   <div class="grid2">
-    <div class="card"><h2>문의 많은 차량 TOP 15 <span class="muted">(문의수 순)</span></h2><div class="tw"><table id="tCarInq"></table></div></div>
-    <div class="card"><h2>계약 많은 차량 TOP 15 <span class="muted">(계약수 순)</span></h2><div class="tw"><table id="tCarSale"></table></div></div>
+    <div class="card"><h2>문의 많은 차량 TOP 10 <span class="tip" title="브랜드 색 배지 + 문의(DB) 막대. 숫자는 DB(제외후) / 계약 / 전환율">ⓘ</span></h2><div id="carInqBars"></div><details class="tbl"><summary>표로 보기</summary><div class="tw"><table id="tCarInq"></table></div></details></div>
+    <div class="card"><h2>계약 많은 차량 TOP 10 <span class="tip" title="브랜드 색 배지 + 계약 막대. 숫자는 계약 / 실행매출 / 전환율">ⓘ</span></h2><div id="carSaleBars"></div><details class="tbl"><summary>표로 보기</summary><div class="tw"><table id="tCarSale"></table></div></details></div>
   </div>
-  <div class="card"><h2>차량 문의 vs 계약</h2><canvas id="chCar"></canvas></div>
+  <div class="grid2">
+    <div class="card"><h2>차량 브랜드별 계약 비율</h2><canvas id="chCarBrand" style="max-height:320px"></canvas></div>
+    <div class="card"><h2>차량 브랜드별 전환율 <span class="tip" title="브랜드별 계약 ÷ DB(제외후). 계약 30건 이상 브랜드만">ⓘ</span></h2><canvas id="chCarBrandCv" style="max-height:320px"></canvas></div>
+  </div>
 
   <div class="card">
     <div class="row" style="align-items:center;margin-bottom:6px"><h2 style="margin:0">리드타임 <span class="muted">(계약일자 − 문의일자, 음수·1년 초과·경비 제외)</span></h2>
@@ -193,7 +221,7 @@
     <div style="margin-top:12px"><h3>기간별 추이 <span class="muted">(중앙값·평균·25%/75% 는 일수, 막대는 계약 건수)</span></h3><canvas id="chLeadTrend" style="max-height:280px"></canvas>
       <div class="tw" style="margin-top:8px;max-height:260px"><table id="tLeadTrend"></table></div></div>
     <div class="grid2" style="margin-top:12px">
-      <div><h3>분포</h3><canvas id="chLead"></canvas></div>
+      <div><h3>분포 <span class="tip" title="정상 계약 기준 구간별 건수·비율·누적비율. 누적 비율로 '며칠 안에 몇 %가 계약되는지'를 바로 읽을 수 있음">ⓘ</span></h3><div id="ldBars"></div></div>
       <div><h3>차량 브랜드별</h3><div class="tw"><table id="tLeadBrand"></table></div></div>
     </div>
     <div class="grid2" style="margin-top:12px">
@@ -532,6 +560,16 @@ const METRIC_H_NOCOST = ['DB(전체)','DB(제외후)','계약수','실행매출'
 // 열: DB(전체) | DB(제외후) | 계약 | 매출 | 마진 | 광고비 | ROAS | CPA(DB) | CPA(계약) | 전환율   ※ CPA·전환율은 제외후 DB 기준
 function metricCols(s){ return [fmt(s.db), fmt(s.dbSel), fmt(s.contracts), won(s.revenue), won(s.carprice), won(s.cost), s.cost?fmt(100*s.revenue/s.cost,1)+'%':'-', s.cost?won(s.cost/(s.dbSel||NaN)):'-', s.cost?won(s.cost/(s.contracts||NaN)):'-', pct(s.contracts,s.dbSel)]; }
 const METRIC_H = ['DB(전체)','DB(제외후)','계약수','실행매출','차량가 합계','광고비','ROAS','CPA(DB당)','계약당 비용','전환율'];
+/* 통계 유틸 */
+const median=a=>{ const v=a.filter(x=>x!=null&&isFinite(x)).sort((x,y)=>x-y); if(!v.length) return null; const m=Math.floor(v.length/2); return v.length%2? v[m] : (v[m-1]+v[m])/2; };
+const mean=a=>{ const v=a.filter(x=>x!=null&&isFinite(x)); return v.length? v.reduce((p,q)=>p+q,0)/v.length : null; };
+function outliers(vals){ const v=vals.filter(x=>x!=null&&isFinite(x)).sort((a,b)=>a-b); if(v.length<4) return {hi:Infinity,lo:-Infinity}; const q=p=>{ const i=(v.length-1)*p, lo=Math.floor(i), hi=Math.ceil(i); return v[lo]+(v[hi]-v[lo])*(i-lo); }; const q1=q(.25), q3=q(.75), iqr=q3-q1; return {hi:q3+1.5*iqr, lo:q1-1.5*iqr, q1, q3}; }
+const outl=(x,o)=> x==null||!isFinite(x)? '' : x>o.hi? '<span class="outl hi">▲이상치</span>' : x<o.lo? '<span class="outl lo">▼이상치</span>' : '';
+const BRAND_COLORS={'기아':'#2563EB','현대':'#10B981','제네시스':'#8B5CF6','테슬라':'#EF4444','르노코리아':'#F59E0B','BMW':'#06B6D4','벤츠':'#6B7280','KGM':'#EC4899','아우디':'#84CC16','볼보':'#0EA5E9','쉐보레':'#D97706','폭스바겐':'#14B8A6','렉서스':'#A855F7','토요타':'#DC2626','포르쉐':'#7C3AED','MINI':'#374151','지프':'#65A30D','BYD':'#F97316','폴스타':'#0891B2','랜드로버':'#4D7C0F','기타':'#9CA3AF','미지정':'#D1D5DB'};
+const EXTRA_PALETTE=['#1D4ED8','#059669','#7C3AED','#B91C1C','#B45309','#0E7490','#BE185D','#4D7C0F','#6D28D9','#0F766E','#C2410C','#1E3A8A'];
+const _colorMap=new Map(); const hashColor=str=>{ const k=String(str||'?'); if(BRAND_COLORS[k]) return BRAND_COLORS[k]; if(!_colorMap.has(k)) _colorMap.set(k, EXTRA_PALETTE[_colorMap.size % EXTRA_PALETTE.length]); return _colorMap.get(k); };   // 서로 구분되는 색을 순서대로 배정
+const brandBadge=b=>{ const col=BRAND_COLORS[b]||hashColor(b||'?'); const t=(b||'미지정').slice(0,6); return `<span class="badge" style="background:${col}" title="${esc(b||'브랜드 미지정')}">${esc(t)}</span>`; };
+const delta=(cur,prev,higherIsGood=true,unit='')=>{ if(prev==null||!isFinite(prev)||prev===0||cur==null||!isFinite(cur)) return ''; const d=100*(cur-prev)/Math.abs(prev); const cls= Math.abs(d)<1? 'flat' : (d>0)===higherIsGood? 'up' : 'down'; const arrow= Math.abs(d)<1? '→' : d>0? '▲' : '▼'; return `<div class="d ${cls}">${arrow} 전월 대비 ${fmt(Math.abs(d),1)}%${unit}</div>`; };
 function groupBy(rows, keyFn){ const m=new Map(); rows.forEach(r=>{ const k=keyFn(r)??'(없음)'; if(!m.has(k)) m.set(k,[]); m.get(k).push(r); }); return m; }
 function renderTable(id, headers, rows, opts={}){
   const t=$('#'+id); const leftCols=opts.left||[0];
@@ -556,15 +594,18 @@ function renderTrend(Pf, f, s){
   const byP=groupBy(Pf, r=>r.period); const periods=[...new Set([...byP.keys(), ...bySP.keys()])].sort();
   const plabel = p => { if(f.grain==='month') return p.slice(0,7); if(f.grain==='year') return p.slice(0,4);
     if(f.grain==='week'){ const d=new Date(p+'T00:00:00'); const e=new Date(d); e.setDate(d.getDate()+6); const md=x=>`${x.getMonth()+1}/${x.getDate()}`; return `${md(d)}~${md(e)} 주`; } return p; };
-  const tr = periods.map(p=>{ const x=sumRows(byP.get(p)||[],f,bySP.get(p)||[]); return {p, label:plabel(p), ...x}; });
+  const tr = periods.map(p=>{ const x=sumRows(byP.get(p)||[],f,bySP.get(p)||[]); return {p, label:plabel(p), ...x}; }).filter(x=>x.db>0 || x.contracts>0);   // 유입이 없는 말단 기간(데이터 미도달)은 제외
   renderTable('tTrend', ['기간',...METRIC_H], tr.map(x=>[x.label, ...metricCols(x)]), {foot:['합계',...metricCols(s)]});
   chart('chTrend',{data:{labels:tr.map(x=>x.label), datasets:[
-    {type:'bar',label:'DB(전체)',data:tr.map(x=>x.db),backgroundColor:'rgba(37,99,235,.18)',yAxisID:'y'},
-    {type:'bar',label:'DB('+f.dbLabel+')',data:tr.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.55)',yAxisID:'y'},
-    {type:'bar',label:'계약수',data:tr.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.6)',yAxisID:'y'},
-    {type:'line',label:'광고비',data:tr.map(x=>x.cost),borderColor:'#f59e0b',backgroundColor:'#f59e0b',yAxisID:'y2',tension:.2},
-    {type:'line',label:'실행매출',data:tr.map(x=>x.revenue),borderColor:'#8b5cf6',backgroundColor:'#8b5cf6',yAxisID:'y2',tension:.2}]},
-    options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{callback:v=>won(v)}}}}});
+    {type:'bar',label:'광고비',data:tr.map(x=>x.cost),backgroundColor:'rgba(245,158,11,.75)',yAxisID:'y'},
+    {type:'bar',label:'실행매출',data:tr.map(x=>x.revenue),backgroundColor:'rgba(37,99,235,.75)',yAxisID:'y'},
+    {type:'line',label:'ROAS(%)',data:tr.map(x=>x.cost? +(100*x.revenue/x.cost).toFixed(1) : null),borderColor:'#dc2626',backgroundColor:'#dc2626',yAxisID:'y2',tension:.2,borderWidth:3}]},
+    options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true,ticks:{callback:v=>won(v)}},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}});
+  chart('chTrend2',{data:{labels:tr.map(x=>x.label), datasets:[
+    {type:'bar',label:'DB('+f.dbLabel+')',data:tr.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.45)',yAxisID:'y'},
+    {type:'bar',label:'계약수',data:tr.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.85)',yAxisID:'y2'},
+    {type:'line',label:'전환율(%)',data:tr.map(x=>x.dbSel? +(100*x.contracts/x.dbSel).toFixed(2) : null),borderColor:'#7c3aed',backgroundColor:'#7c3aed',yAxisID:'y3',tension:.2,borderWidth:3}]},
+    options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false}},y3:{display:false,beginAtZero:true}}}});
 
 }
 // 추이 단위 라디오 변경 → 추이만 다시 조회 (서버 1회, 경량)
@@ -583,6 +624,7 @@ async function loadDash(){
     const t0=Date.now();
     const args={p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:f.basis,p_brands:f.brands.length?f.brands:null};
     let D = await rpc('fn_dashboard',args);
+    const PMraw = f.grain==='month' ? null : await rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:'month',p_basis:f.basis});
     if((D.status.inquiries>0 || D.status.car_unmapped>0) && (!(D.status.agg_rows>0) || !(D.status.agg_car_rows>0))){ loading(true,'집계 테이블이 비어 있어 갱신 중… (최초 1회, 10~60초)',50); await rpc('fn_refresh_agg',{}); loading(true,'다시 조회 중…',75); D = await rpc('fn_dashboard',args); }
     loading(true,'화면 그리는 중…',90);
     if(D.status.ip_pending>0) ipMigrateLoop(D.status.ip_pending);
@@ -590,6 +632,8 @@ async function loadDash(){
     const took=((Date.now()-t0)/1000).toFixed(1);
     const inc = r => f.types.includes(r.media_type) && (!f.brands.length || f.brands.includes(brandOf(r)));
     const Pf=P.filter(inc), Mf=M.filter(inc); const Sf=(S||[]).filter(r=>!f.brands.length || f.brands.includes(r.brand));
+    const PM=(PMraw||P).filter(inc);   // 월별 시리즈 (전월 대비·해석용)
+    const SM=Sf.map(r=>({...r, period:String(r.period).slice(0,7)+'-01'}));
     if(st.brands && JSON.stringify(st.brands)!==JSON.stringify(BRANDS)){ BRANDS=st.brands; const keep=msSel('msBrand'); msFill('msBrand',BRANDS); document.querySelectorAll('#msBrand input').forEach(i=>i.checked=keep.includes(i.value)); msLabel('msBrand'); msFill('msTrend',BRANDS,trendRefilter); msFill('msDl',BRANDS); msFill('msLead',BRANDS,leadReload); if(!document.querySelector('#msSpend input')) msFill('msSpend',BRANDS); }
     DASH={f, P:Pf, M:Mf, S:Sf, C, L0, LM, LC, LB, LD, LMB, LPL, LT};
     const unc = M.filter(r=>r.media_type==='미분류').length;
@@ -602,33 +646,58 @@ async function loadDash(){
 
     // KPI
     const s=sumRows(Mf,f,Sf); const lt=L0[0]||{};
+    // 월별 합계 → 최근 2개 완전월 비교
+    const byPM=groupBy(PM, r=>String(r.period).slice(0,7)); const bySM=groupBy(SM, r=>String(r.period).slice(0,7));
+    const months=[...new Set([...byPM.keys(), ...bySM.keys()])].sort();
+    const mstatAll=months.map(m=>({m, ...sumRows(byPM.get(m)||[], f, bySM.get(m)||[])}));
+    // 완전월만 비교: 유입 데이터가 월말까지 있는 달 (마지막 유입일 이전에 끝난 달)
+    const lastInq=(st.inquiry_max||'').slice(0,10); const monthEnd=m=>{ const [y,mo]=m.split('-').map(Number); return new Date(y,mo,0).toISOString().slice(0,10); };
+    const mstat=mstatAll.filter(x=>x.db>0 && (!lastInq || monthEnd(x.m)<=lastInq));
+    const cur=mstat[mstat.length-1], prev=mstat[mstat.length-2];
+    const kd=(fn,good=true)=> (cur&&prev)? delta(fn(cur),fn(prev),good) : '';
+    const roasOf=x=>x.cost? 100*x.revenue/x.cost : null, cpaOf=x=>x.cost&&x.dbSel? x.cost/x.dbSel : null, cpcOf=x=>x.cost&&x.contracts? x.cost/x.contracts : null, cvOf=x=>x.dbSel? 100*x.contracts/x.dbSel : null;
     $('#kpis').innerHTML=[
-      ['광고비' + (f.brands.length? ` · ${f.brands.length===1? f.brands[0] : f.brands.length+'개 브랜드'}` : ' · 전체 브랜드'), won(s.cost), s.cost?'':'광고비 미입력 (광고비 탭)'],
-      ['실행매출', won(s.revenue), `계약마진 합계 · 건당 ${won(s.contracts? s.revenue/s.contracts:null)}`],
-      ['ROAS', s.cost? fmt(100*s.revenue/s.cost,1)+'%' : '-', ''],
-      ['계약 수', fmt(s.contracts), ''],
-      ['CPA (DB당 비용)', s.cost&&s.dbSel? fmt(s.cost/s.dbSel)+'원':'-', `광고비 ÷ DB ${fmt(s.dbSel)}건 (${f.dbLabel})`],
-      ['계약당 비용', s.cost&&s.contracts? fmt(s.cost/s.contracts)+'원':'-', `광고비 ÷ 계약 ${fmt(s.contracts)}건`],
-      ['문의→계약 전환율', pct(s.contracts,s.dbSel), `계약 ${fmt(s.contracts)} ÷ DB ${fmt(s.dbSel)}`],
-    ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
+      ['광고비' + (f.brands.length? ` · ${f.brands.length===1? f.brands[0] : f.brands.length+'개 브랜드'}` : ' · 전체 브랜드'), won(s.cost), s.cost?'':'광고비 미입력 (광고비 탭)', kd(x=>x.cost,true)],
+      ['실행매출', won(s.revenue), `건당 ${won(s.contracts? s.revenue/s.contracts:null)}`, kd(x=>x.revenue,true)],
+      ['ROAS', s.cost? fmt(100*s.revenue/s.cost,1)+'%' : '-', '', kd(roasOf,true)],
+      ['계약 수', fmt(s.contracts), '', kd(x=>x.contracts,true)],
+      ['CPA (DB당 비용)', s.cost&&s.dbSel? fmt(s.cost/s.dbSel)+'원':'-', `DB ${fmt(s.dbSel)}건 (${f.dbLabel})`, kd(cpaOf,false)],
+      ['계약당 비용', s.cost&&s.contracts? fmt(s.cost/s.contracts)+'원':'-', `계약 ${fmt(s.contracts)}건`, kd(cpcOf,false)],
+      ['문의→계약 전환율', pct(s.contracts,s.dbSel), `계약 ${fmt(s.contracts)} ÷ DB ${fmt(s.dbSel)}`, kd(cvOf,true)],
+    ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div>${k[3]||''}<div class="s">${k[2]}</div></div>`).join('');
+    if(cur&&prev) $('#kpis').insertAdjacentHTML('beforeend', `<div class="kpi" style="background:#eef2f7"><div class="l">전월 대비 기준</div><div class="v" style="font-size:14px">${esc(prev.m)} → ${esc(cur.m)}</div><div class="s">유입 데이터가 월말까지 있는 마지막 두 달 · 최근 달 매출은 계약 진행 중</div></div>`);
 
     DASH.Pall=Pf; renderTrend(trendFilter(Pf), f, s);
 
     // 매체별
     const ltByMedia=new Map(LM.map(x=>[x.dim_value,x]));
     const byM=groupBy(Mf, r=>r.media_std); const mr=[...byM.entries()].map(([k,rows])=>({k, type:rows[0].media_type, brand:rows[0].brand, lt:ltByMedia.get(k), ...sumRows(rows,f)})).sort((a,b)=>b.dbSel-a.dbSel);
-    renderTable('tMedia', ['매체','유형','브랜드',...METRIC_H_NOCOST,'리드타임 중앙값','리드타임 평균','7일내'], mr.map(x=>[esc(x.k), esc(x.type), esc(x.brand??''), ...metricColsNoCost(x), x.lt?fmt(x.lt.median_days,1)+'일':'-', x.lt?fmt(x.lt.avg_days,1)+'일':'-', x.lt?fmt(x.lt.within7_pct,1)+'%':'-']), {left:[0,1,2], foot:['합계','','',...metricColsNoCost(s), lt.n?fmt(lt.median_days,1)+'일':'-', lt.n?fmt(lt.avg_days,1)+'일':'-', lt.n?fmt(lt.within7_pct,1)+'%':'-']});
-    const top=mr.slice(0,15);
-    chart('chMedia',{type:'bar',data:{labels:top.map(x=>x.k),datasets:[{label:'DB(전체)',data:top.map(x=>x.db),backgroundColor:'rgba(37,99,235,.25)'},{label:'DB('+f.dbLabel+')',data:top.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.7)'},{label:'계약수',data:top.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.8)'}]},options:{indexAxis:'y',scales:{x:{beginAtZero:true}}}});
+    const mrBig=mr.filter(x=>x.dbSel>=100); const oCv=outliers(mrBig.map(x=>x.dbSel? 100*x.contracts/x.dbSel : null)), oLt=outliers(mr.filter(x=>x.lt&&x.lt.n>=5).map(x=>+x.lt.median_days));
+    const mRow = x => { const cv=x.dbSel? 100*x.contracts/x.dbSel : null; return [esc(x.k), esc(x.type), esc(x.brand??''), fmt(x.db), fmt(x.dbSel), fmt(x.contracts), won(x.revenue), won(x.carprice), pct(x.contracts,x.dbSel)+(x.dbSel>=100? outl(cv,oCv):''), x.lt?fmt(x.lt.median_days,1)+'일'+(x.lt.n>=5? outl(+x.lt.median_days,oLt):''):'-', x.lt?fmt(x.lt.avg_days,1)+'일':'-', x.lt?fmt(x.lt.within7_pct,1)+'%':'-']; };
+    renderTable('tMedia', ['매체','유형','브랜드',...METRIC_H_NOCOST,'리드타임 중앙값','리드타임 평균','7일내'], mr.map(mRow), {left:[0,1,2], foot:['합계 / 평균 / 중앙값','','',fmt(s.db), fmt(s.dbSel), fmt(s.contracts), won(s.revenue), won(s.carprice), `${pct(s.contracts,s.dbSel)} · 평균 ${fmt(mean(mrBig.map(x=>100*x.contracts/x.dbSel)),1)}% · 중앙 ${fmt(median(mrBig.map(x=>100*x.contracts/x.dbSel)),1)}%`, lt.n?`${fmt(lt.median_days,1)}일 · 매체중앙 ${fmt(median(mr.filter(x=>x.lt&&x.lt.n>=5).map(x=>+x.lt.median_days)),1)}일`:'-', lt.n?fmt(lt.avg_days,1)+'일':'-', lt.n?fmt(lt.within7_pct,1)+'%':'-']});
+    const top=mr.slice(0,12); const shortN=k=>k.length>14? k.slice(0,13)+'…' : k;
+    chart('chMedia',{type:'bar',data:{labels:top.map(x=>shortN(x.k)),datasets:[{label:'DB('+f.dbLabel+')',data:top.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.75)'}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true}}}});
+    const cvMed=median(mrBig.map(x=>100*x.contracts/x.dbSel));
+    chart('chMediaCv',{type:'bar',data:{labels:top.map(x=>shortN(x.k)),datasets:[{label:'전환율(%)',data:top.map(x=>x.dbSel? +(100*x.contracts/x.dbSel).toFixed(1):0),backgroundColor:top.map(x=> (x.dbSel&&100*x.contracts/x.dbSel>=cvMed)? 'rgba(16,185,129,.85)':'rgba(239,68,68,.7)')}]},options:{indexAxis:'y',plugins:{legend:{display:false},title:{display:true,text:`매체 중앙값 ${fmt(cvMed,1)}% 이상 초록 · 미만 빨강`}},scales:{x:{beginAtZero:true,ticks:{callback:v=>v+'%'}}}}});
 
     // 브랜드/플랫폼
     const bySB=groupBy(Sf, r=>r.brand);
     const byB=groupBy(Mf, brandOf); const brandKeys=[...new Set([...byB.keys(), ...bySB.keys()])];  // 브랜드 미지정 매체는 매체명으로 각각 표시
     const br=brandKeys.map(k=>({k,...sumRows(byB.get(k)||[],f,bySB.get(k)||[])})).sort((a,b)=>b.dbSel-a.dbSel);
-    renderTable('tBrand', ['브랜드',...METRIC_H], br.map(x=>[esc(x.k),...metricCols(x)]), {foot:['합계',...metricCols(s)]});
+    const brC=br.filter(x=>x.cost>0); const brMedCost=median(brC.map(x=>x.cost))||0; const brSig=brC.filter(x=>x.cost>=Math.max(3e7, brMedCost*0.1));
+    const oRoas=outliers(brSig.map(x=>100*x.revenue/x.cost)), oCpa=outliers(brSig.filter(x=>x.dbSel).map(x=>x.cost/x.dbSel));
+    const bRow = x => { const c=metricCols(x); if(brSig.includes(x)){ c[6]+=outl(100*x.revenue/x.cost,oRoas); if(x.dbSel) c[7]+=outl(x.cost/x.dbSel,oCpa); } return [esc(x.k), ...c]; };
+    const statRow = (label, fn) => ['<b>'+label+'</b>', '', '', '', '', '', '', fn(brC.map(x=>100*x.revenue/x.cost))!=null? fmt(fn(brC.map(x=>100*x.revenue/x.cost)),1)+'%':'-', fn(brC.filter(x=>x.dbSel).map(x=>x.cost/x.dbSel))!=null? won(fn(brC.filter(x=>x.dbSel).map(x=>x.cost/x.dbSel))):'-', fn(brC.filter(x=>x.contracts).map(x=>x.cost/x.contracts))!=null? won(fn(brC.filter(x=>x.contracts).map(x=>x.cost/x.contracts))):'-', fn(br.filter(x=>x.dbSel).map(x=>100*x.contracts/x.dbSel))!=null? fmt(fn(br.filter(x=>x.dbSel).map(x=>100*x.contracts/x.dbSel)),1)+'%':'-'];
+    renderTable('tBrand', ['브랜드',...METRIC_H], [...br.map(bRow), statRow('브랜드 평균', mean), statRow('브랜드 중앙값', median)], {foot:['합계',...metricCols(s)]});
+    // 해석과 제시점
+    renderInsights({f, s, mstat, cur, prev, br, brC, mr, mrBig, lt, LD, LB, st});
     const chKeys=CHANNELS.filter(c=>Sf.some(r=>r.channel===c)).concat([...new Set(Sf.map(r=>r.channel))].filter(c=>!CHANNELS.includes(c)));
     const chRows=[...bySB.entries()].map(([b,rows])=>{ const m={}; rows.forEach(r=>{ m[r.channel]=(m[r.channel]||0)+ +r.cost; }); const tot=Object.values(m).reduce((a,x)=>a+x,0); return [esc(b), won(tot), ...chKeys.map(c=>m[c]?won(m[c]):'-')]; });
     renderTable('tSpendCh', ['브랜드','광고비 합계',...chKeys], chRows, {foot:['합계', won(s.cost), ...chKeys.map(c=>won(Sf.filter(r=>r.channel===c).reduce((a,r)=>a+ +r.cost,0)))]});
+    const CH_COLORS=['#1d4ed8','#3b82f6','#93c5fd','#f59e0b','#fbbf24','#10b981','#6ee7b7','#8b5cf6','#c4b5fd','#ef4444','#f97316','#6b7280','#9ca3af','#d1d5db','#0ea5e9'];
+    const spB=[...bySB.entries()].map(([b,rows])=>({b, tot:rows.reduce((a,r)=>a+ +r.cost,0), m:Object.fromEntries(chKeys.map(c=>[c, rows.filter(r=>r.channel===c).reduce((a,r)=>a+ +r.cost,0)]))})).filter(x=>x.tot>0).sort((a,b)=>b.tot-a.tot).slice(0,12);
+    chart('chSpendCh',{type:'bar',data:{labels:spB.map(x=>`${x.b} (${won(x.tot)})`),datasets:chKeys.map((c,i)=>({label:c,data:spB.map(x=>+(100*x.m[c]/x.tot).toFixed(1)),backgroundColor:CH_COLORS[i%CH_COLORS.length],stack:'s'}))},
+      options:{indexAxis:'y',plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.x}%`}}},scales:{x:{stacked:true,max:100,ticks:{callback:v=>v+'%'}},y:{stacked:true}}}});
     const byPl=groupBy(Mf, r=>r.platform||'(플랫폼 미지정)'); const pl=[...byPl.entries()].map(([k,rows])=>({k,...sumRows(rows,f)})).sort((a,b)=>b.dbSel-a.dbSel);
     renderTable('tPlatform', ['플랫폼',...METRIC_H_NOCOST], pl.map(x=>[esc(x.k),...metricColsNoCost(x)]));
 
@@ -637,10 +706,15 @@ async function loadDash(){
     const named=cars.filter(x=>x.model_std && !['(없음)','-','없음 없음'].includes(x.model_std.trim()));
     const ci=[...named].sort((a,b)=>b.dbSel-a.dbSel || b.contracts-a.contracts).slice(0,15), cs=[...named].sort((a,b)=>b.contracts-a.contracts || b.dbSel-a.dbSel).slice(0,15);
     const carRow = x => [esc(x.model_std||'(없음)'), esc(x.car_brand??''), fmt(x.db_count), fmt(x.dbSel), fmt(x.contracts), pct(x.contracts,x.dbSel), won(x.revenue), won(x.car_price_sum)];
-    renderTable('tCarInq', ['차량','브랜드','DB(전체)','DB(제외후)','계약','전환율','매출(계약마진)','차량가 합계'], ci.map(carRow), {left:[0,1]});
-    renderTable('tCarSale', ['차량','브랜드','DB(전체)','DB(제외후)','계약','전환율','매출(계약마진)','차량가 합계'], cs.map(carRow), {left:[0,1]});
-    const cc=[...named].sort((a,b)=>b.contracts-a.contracts).slice(0,12);
-    chart('chCar',{type:'bar',data:{labels:cc.map(x=>x.model_std),datasets:[{label:'문의(DB)',data:cc.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.5)',yAxisID:'y'},{label:'계약',data:cc.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.9)',yAxisID:'y2'}]},options:{scales:{y:{beginAtZero:true,position:'left'},y2:{beginAtZero:true,position:'right',grid:{drawOnChartArea:false}}}}});
+    renderTable('tCarInq', ['차량','브랜드','DB(전체)','DB(제외후)','계약','전환율','실행매출','차량가 합계'], ci.map(carRow), {left:[0,1]});
+    renderTable('tCarSale', ['차량','브랜드','DB(전체)','DB(제외후)','계약','전환율','실행매출','차량가 합계'], cs.map(carRow), {left:[0,1]});
+    const barRows=(list, valFn, colorFn, textFn)=>{ const mx=Math.max(...list.map(valFn),1); return list.map(x=>`<div class="carrow">${brandBadge(x.car_brand)}<span class="nm" title="${esc(x.model_std)}">${esc(x.model_std)}</span><div class="cbar"><div style="width:${(100*valFn(x)/mx).toFixed(1)}%;background:${colorFn(x)}"></div></div><span class="val">${textFn(x)}</span></div>`).join(''); };
+    $('#carInqBars').innerHTML=barRows(ci.slice(0,10), x=>x.dbSel, x=>BRAND_COLORS[x.car_brand]||hashColor(x.car_brand||'?'), x=>`${fmt(x.dbSel)} · 계약 ${fmt(x.contracts)} · ${pct(x.contracts,x.dbSel)}`);
+    $('#carSaleBars').innerHTML=barRows(cs.slice(0,10), x=>x.contracts, x=>BRAND_COLORS[x.car_brand]||hashColor(x.car_brand||'?'), x=>`${fmt(x.contracts)}건 · ${won(x.revenue)} · ${pct(x.contracts,x.dbSel)}`);
+    const byCB=groupBy(named, x=>x.car_brand||'미지정'); const cb=[...byCB.entries()].map(([k,rows])=>({k, c:rows.reduce((a,x)=>a+x.contracts,0)})).filter(x=>x.c>0).sort((a,b)=>b.c-a.c); const cbTop=cb.slice(0,8), cbRest=cb.slice(8).reduce((a,x)=>a+x.c,0); if(cbRest) cbTop.push({k:'기타',c:cbRest});
+    chart('chCarBrand',{type:'doughnut',data:{labels:cbTop.map(x=>x.k),datasets:[{data:cbTop.map(x=>x.c),backgroundColor:cbTop.map(x=>BRAND_COLORS[x.k]||hashColor(x.k))}]},options:{plugins:{legend:{position:'right'},tooltip:{callbacks:{label:c=>`${c.label}: ${fmt(c.parsed)}건 (${fmt(100*c.parsed/cbTop.reduce((a,x)=>a+x.c,0),1)}%)`}}},cutout:'55%'}});
+    const cbCv=[...byCB.entries()].map(([k,rows])=>({k, c:rows.reduce((a,x)=>a+x.contracts,0), d:rows.reduce((a,x)=>a+x.dbSel,0)})).filter(x=>x.c>=30&&x.d>0).map(x=>({...x, cv:100*x.c/x.d})).sort((a,b)=>b.cv-a.cv).slice(0,10);
+    chart('chCarBrandCv',{type:'bar',data:{labels:cbCv.map(x=>x.k),datasets:[{label:'전환율(%)',data:cbCv.map(x=>+x.cv.toFixed(1)),backgroundColor:cbCv.map(x=>BRAND_COLORS[x.k]||hashColor(x.k))}]},options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.x}% (계약 ${fmt(cbCv[c.dataIndex].c)} / DB ${fmt(cbCv[c.dataIndex].d)})`}}},scales:{x:{beginAtZero:true,ticks:{callback:v=>v+'%'}}}}});
 
     renderLead({L0, LM, LC, LB, LD, LMB, LPL, LT});
   }catch(e){ $('#status').innerHTML='<span class="pill bad">오류</span> '+esc(sqlErr(e)); }
@@ -657,6 +731,38 @@ async function ipMigrateLoop(pending){
     toast('IP 중복 판정 완료 — 반영된 결과로 다시 조회합니다', 5000); loadDash();
   }catch(e){ toast('IP 이관 중단: '+sqlErr(e)+' (다시 조회하면 이어서 진행)', 6000); }
   finally{ _ipLoop=false; }
+}
+/* 해석과 제시점 (규칙 기반) */
+function renderInsights(ctx){
+  const {f,s,mstat,cur,prev,br,brC,mr,mrBig,lt,LD,LB,st}=ctx; const out=[];
+  const add=(cls,title,body)=>out.push(`<div class="it ${cls}"><div><b>${title}</b>${body}</div></div>`);
+  const roas=x=>x.cost? 100*x.revenue/x.cost : null;
+  if(!s.cost) add('warn','광고비 미입력', `선택 기간에 광고비가 없어 ROAS·CPA를 계산할 수 없습니다. 광고비 탭에서 월별 양식을 올리면 즉시 반영됩니다.`);
+  if(cur&&prev){
+    const r1=roas(cur), r0=roas(prev);
+    if(r1!=null&&r0!=null){ const d=r1-r0; add(d>=0?'good':'bad', `ROAS ${d>=0?'개선':'하락'} (${prev.m} ${fmt(r0,0)}% → ${cur.m} ${fmt(r1,0)}%, ${d>=0?'+':''}${fmt(d,0)}%p)`, `광고비 ${won(prev.cost)}→${won(cur.cost)} (${fmt(100*(cur.cost-prev.cost)/prev.cost,0)}%), 실행매출 ${won(prev.revenue)}→${won(cur.revenue)}. ${cur.m===mstat[mstat.length-1].m?'최근 달은 계약 진행 중이라 2~4주 뒤 ROAS가 올라오는 것이 정상입니다.':''}`); }
+    const c1=cur.cost&&cur.dbSel? cur.cost/cur.dbSel:null, c0=prev.cost&&prev.dbSel? prev.cost/prev.dbSel:null;
+    if(c1&&c0){ const d=100*(c1-c0)/c0; add(d<=0?'good':(d>15?'bad':'warn'), `CPA ${d<=0?'개선':'상승'} ${fmt(Math.abs(d),0)}% (${fmt(c0)}원 → ${fmt(c1)}원)`, d>15? `문의 1건당 비용이 크게 올랐습니다. 광고비 ${fmt(100*(cur.cost-prev.cost)/prev.cost,0)}% 변동 대비 DB ${fmt(100*(cur.dbSel-prev.dbSel)/prev.dbSel,0)}% 변동 — 매체 믹스·소재 점검 권장.` : `문의 획득 효율은 ${d<=0?'유지·개선':'소폭 변동'} 범위입니다.`); }
+    const v1=cur.dbSel?100*cur.contracts/cur.dbSel:null, v0=prev.dbSel?100*prev.contracts/prev.dbSel:null;
+    if(v1!=null&&v0!=null){ const d=v1-v0; add(Math.abs(d)<0.3?'':(d>0?'good':'bad'), `문의→계약 전환율 ${fmt(v0,1)}% → ${fmt(v1,1)}%`, Math.abs(d)<0.3? '전환율은 안정적입니다.' : d>0? '같은 문의로 더 많은 계약 — 영업 처리 효율이 좋아졌습니다.' : '문의 대비 계약이 줄었습니다. 최근 달이면 리드타임 영향, 아니면 접수 잔존·응대 지연을 확인하세요.'); }
+  }
+  const costMed=median(brC.map(x=>x.cost))||0; const brS=brC.filter(x=>x.cost>=Math.max(3e7, costMed*0.1));   // 광고비 1천만 원 또는 중앙값 10% 이상 브랜드만 판정
+  if(brS.length>=3){
+    const sorted=[...brS].sort((a,b)=>roas(b)-roas(a)); const top=sorted[0], bot=sorted[sorted.length-1]; const med=median(brS.map(roas));
+    add('good', `효율 최상 브랜드: ${esc(top.k)} ROAS ${fmt(roas(top),0)}%`, `광고비 ${won(top.cost)} → 실행매출 ${won(top.revenue)} (브랜드 중앙값 ${fmt(med,0)}%). 증액 여력이 있다면 1순위 후보입니다.`);
+    if(roas(bot)<med*0.6) add('bad', `효율 최하 브랜드: ${esc(bot.k)} ROAS ${fmt(roas(bot),0)}%`, `광고비 ${won(bot.cost)} 대비 실행매출 ${won(bot.revenue)}. 중앙값의 ${fmt(100*roas(bot)/med,0)}% 수준 — 소재·타깃 점검 또는 예산 일부를 ${esc(top.k)}(으)로 재배분 검토.`);
+    const o=outliers(brS.map(roas)); const his=brS.filter(x=>roas(x)>o.hi), los=brS.filter(x=>roas(x)<o.lo);
+    if(his.length||los.length) add('warn','ROAS 이상치 감지', `${his.length?'비정상적으로 높음: '+his.map(x=>esc(x.k)).join(', ')+' (광고비 누락·매출 귀속 오류 가능성 확인). ':''}${los.length?'비정상적으로 낮음: '+los.map(x=>esc(x.k)).join(', ')+'.':''}`);
+  }
+  if(mrBig.length>=5){
+    const cv=x=>100*x.contracts/x.dbSel; const srt=[...mrBig].sort((a,b)=>cv(b)-cv(a)); const med=median(mrBig.map(cv));
+    add('', `전환율 최고 매체: ${esc(srt[0].k)} ${fmt(cv(srt[0]),1)}% (매체 중앙값 ${fmt(med,1)}%)`, `DB ${fmt(srt[0].dbSel)}건 → 계약 ${fmt(srt[0].contracts)}건. 최저: ${esc(srt[srt.length-1].k)} ${fmt(cv(srt[srt.length-1]),1)}% (DB ${fmt(srt[srt.length-1].dbSel)}건) — DB 품질 점검 대상.`);
+  }
+  if(lt&&lt.n){ const ex=LD.filter(x=>x.bucket.startsWith('제외')).reduce((a,x)=>a+x.n,0); add(lt.median_days<=3?'good':(lt.median_days>7?'warn':''), `리드타임 중앙값 ${fmt(lt.median_days,1)}일 · 7일 내 계약 ${fmt(lt.within7_pct,1)}%`, `평균 ${fmt(lt.avg_days,1)}일은 장기 건에 끌려 올라가므로 보고에는 중앙값·75%(${fmt(lt.p75,0)}일)를 쓰세요.${ex?` 이상치 ${fmt(ex)}건(음수·1년 초과)은 제외했습니다.`:''}${LB&&LB.length>1?` 차량 브랜드별로는 ${esc(LB[0].dim_value)} ${fmt(LB[0].median_days,1)}일이 가장 많습니다(${fmt(LB[0].n)}건).`:''}`); }
+  if(st.media_unclassified) add('warn', `미분류 매체 ${fmt(st.media_unclassified)}종`, '매핑 탭에서 유형·브랜드를 지정하면 브랜드별 ROAS에 반영됩니다.');
+  if(st.sales_unmatched) add('warn', `미매칭 매출 ${fmt(st.sales_unmatched)}건`, '유입 매체에 없는 매체명으로 들어온 매출이라 광고 성과에서 제외됩니다. 다운로드 탭에서 목록 확인.');
+  if(!out.length) add('', '해석할 데이터가 부족합니다', '기간을 넓히거나 광고비를 입력하면 자동 판독이 생성됩니다.');
+  $('#insights').innerHTML=out.join('');
 }
 function leadSel(){ const sel=msSel('msLead'); const n=document.querySelectorAll('#msLead input').length; return (!sel.length||sel.length===n)? null : sel; }
 async function leadReload(){
@@ -683,7 +789,10 @@ function renderLead({L0, LM, LC, LB, LD, LMB, LPL, LT}){
       options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true,title:{display:true,text:'일'}},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},title:{display:true,text:'건'}}}}});
     $('#ltKpis').innerHTML=[['계약 건수(정상)',fmt(lt.n)],['평균',fmt(lt.avg_days,1)+'일'],['중앙값',fmt(lt.median_days,1)+'일'],['25% / 75%',fmt(lt.p25,0)+' / '+fmt(lt.p75,0)+'일'],['7일 이내 비율',fmt(lt.within7_pct,1)+'%']]
       .map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${lt.n?k[1]:'-'}</div></div>`).join('');
-    chart('chLead',{type:'bar',data:{labels:LD.map(x=>x.bucket),datasets:[{label:'계약 건수',data:LD.map(x=>x.n),backgroundColor:LD.map(x=>x.bucket.startsWith('제외')?'rgba(220,38,38,.5)':'rgba(37,99,235,.6)')}]},options:{scales:{y:{beginAtZero:true}}}});
+    const ldN=LD.filter(x=>!x.bucket.startsWith('제외')); const ldTot=ldN.reduce((a,x)=>a+x.n,0)||1; const ldEx=LD.filter(x=>x.bucket.startsWith('제외')).reduce((a,x)=>a+x.n,0);
+    const ldCols=['#1e40af','#2563eb','#3b82f6','#60a5fa','#93c5fd','#f59e0b','#ef4444']; let cum=0; const ldMax=Math.max(...ldN.map(x=>x.n),1);
+    $('#ldBars').innerHTML = ldN.map((x,i)=>{ cum+=x.n; const pc=100*x.n/ldTot, cp=100*cum/ldTot; return `<div class="carrow"><span class="nm" style="width:70px;font-weight:600">${esc(x.bucket)}</span><div class="cbar" style="height:18px"><div style="width:${(100*x.n/ldMax).toFixed(1)}%;background:${ldCols[i%ldCols.length]}"></div></div><span class="val" style="width:230px">${fmt(x.n)}건 · <b>${fmt(pc,1)}%</b> · 누적 ${fmt(cp,1)}%</span></div>`; }).join('')
+      + `<div class="muted" style="margin-top:6px">정상 계약 ${fmt(ldTot)}건 기준 · 제외 ${fmt(ldEx)}건(음수·1년 초과) · 누적 = 해당 구간까지 계약된 비율</div>`;
     const ltRow = x => [esc(x.dim_value??'(없음)'), fmt(x.n), fmt(x.avg_days,1), fmt(x.median_days,1), fmt(x.p25,0)+' / '+fmt(x.p75,0), fmt(x.within7_pct,1)+'%'];
     const LTH=['구분','건수','평균(일)','중앙값(일)','25%/75%','7일내'];
     renderTable('tLeadBrand', LTH, LB.map(ltRow));
