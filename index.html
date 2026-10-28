@@ -218,12 +218,17 @@
         <label><input type="radio" name="lgrain" value="day">일별</label></div>
       <span class="muted" id="leadMsg"></span></div>
     <div class="kpis" id="ltKpis"></div>
+    <h3 style="margin-top:12px">해석과 제시점 <span class="tip" title="선택한 기간·매출 기준일·브랜드에 맞춰 리드타임 수치를 자동 해석합니다. 규칙 기반 문구이며 최종 판단은 담당자가 합니다">ⓘ</span></h3>
+    <div class="ins" id="ltInsights"></div>
     <div style="margin-top:12px"><h3>기간별 추이 <span class="muted">(중앙값·평균·25%/75% 는 일수, 막대는 계약 건수)</span></h3><canvas id="chLeadTrend" style="max-height:280px"></canvas>
       <div class="tw" style="margin-top:8px;max-height:260px"><table id="tLeadTrend"></table></div></div>
     <div class="grid2" style="margin-top:12px">
-      <div><h3>분포 <span class="tip" title="정상 계약 기준 구간별 건수·비율·누적비율. 누적 비율로 '며칠 안에 몇 %가 계약되는지'를 바로 읽을 수 있음">ⓘ</span></h3><div id="ldBars"></div></div>
+      <div><h3 style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">분포 <span class="tip" title="정상 계약 기준 구간별 건수·비율·누적비율. 구분을 고르면 아래 비교 차트가 바뀌고, 값을 고르면 그 매체(브랜드·플랫폼)만의 분포를 전체 비율과 나란히 보여줍니다">ⓘ</span>
+        <select id="ldDim" style="padding:3px 6px;font-size:12px" onchange="ldDimChange()"><option value="media_brand">자사 브랜드</option><option value="media">유입매체</option><option value="platform">플랫폼</option><option value="media_type">매체유형</option></select>
+        <select id="ldVal" style="padding:3px 6px;font-size:12px;max-width:260px" onchange="renderLeadDist()"><option value="">전체</option></select></h3><div id="ldBars"></div></div>
       <div><h3>차량 브랜드별</h3><div class="tw"><table id="tLeadBrand"></table></div></div>
     </div>
+    <div style="margin-top:12px"><h3><span id="ldCmpTitle">자사 브랜드별 리드타임 분포 비교</span> <span class="muted">(구간 비중 100% 누적 · 정상 계약 30건 이상 · 건수 상위 15 · 라벨의 중앙값은 해당 구분의 계약 소요일 중앙값)</span></h3><canvas id="chLeadDist" style="max-height:460px"></canvas></div>
     <div class="grid2" style="margin-top:12px">
       <div><h3>자사 브랜드별 (매체 마스터 브랜드)</h3><div class="tw"><table id="tLeadMBrand"></table></div></div>
       <div><h3>플랫폼별</h3><div class="tw"><table id="tLeadPlatform"></table></div></div>
@@ -628,14 +633,14 @@ async function loadDash(){
     if((D.status.inquiries>0 || D.status.car_unmapped>0) && (!(D.status.agg_rows>0) || !(D.status.agg_car_rows>0))){ loading(true,'집계 테이블이 비어 있어 갱신 중… (최초 1회, 10~60초)',50); await rpc('fn_refresh_agg',{}); loading(true,'다시 조회 중…',75); D = await rpc('fn_dashboard',args); }
     loading(true,'화면 그리는 중…',90);
     if(D.status.ip_pending>0) ipMigrateLoop(D.status.ip_pending);
-    const {status:st, P, M, S, C, L0, LM, LC, LB, LD, LMB, LPL, LT} = D;
+    const {status:st, P, M, S, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM} = D;
     const took=((Date.now()-t0)/1000).toFixed(1);
     const inc = r => f.types.includes(r.media_type) && (!f.brands.length || f.brands.includes(brandOf(r)));
     const Pf=P.filter(inc), Mf=M.filter(inc); const Sf=(S||[]).filter(r=>!f.brands.length || f.brands.includes(r.brand));
     const PM=(PMraw||P).filter(inc);   // 월별 시리즈 (전월 대비·해석용)
     const SM=Sf.map(r=>({...r, period:String(r.period).slice(0,7)+'-01'}));
     if(st.brands && JSON.stringify(st.brands)!==JSON.stringify(BRANDS)){ BRANDS=st.brands; const keep=msSel('msBrand'); msFill('msBrand',BRANDS); document.querySelectorAll('#msBrand input').forEach(i=>i.checked=keep.includes(i.value)); msLabel('msBrand'); msFill('msTrend',BRANDS,trendRefilter); msFill('msDl',BRANDS); msFill('msLead',BRANDS,leadReload); if(!document.querySelector('#msSpend input')) msFill('msSpend',BRANDS); }
-    DASH={f, P:Pf, M:Mf, S:Sf, C, L0, LM, LC, LB, LD, LMB, LPL, LT};
+    DASH={f, P:Pf, M:Mf, S:Sf, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM:LDM||[], ldDim:'media_brand'}; const ldd=$('#ldDim'); if(ldd) ldd.value='media_brand';
     const unc = M.filter(r=>r.media_type==='미분류').length;
     $('#status').innerHTML = `<span class="pill ok">조회 완료 ${took}초</span>` + (f.brands.length?` <span class="pill">브랜드: ${esc(f.brands.join(', '))}</span>`:'') + ` 유입 ${fmt(st.inquiries)}건 (${(st.inquiry_min||'').slice(0,10)} ~ ${(st.inquiry_max||'').slice(0,10)}) · 활성 매출 ${fmt(st.sales_active)}건 (계약일 ${st.contract_min||'-'} ~ ${st.contract_max||'-'}) · 광고비 입력 ${fmt(st.ad_spend_days)}일 (최근 ${st.ad_spend_max||'-'})`
       + (st.sales_unmatched? ` · <span class="pill warn">미매칭 매출 ${fmt(st.sales_unmatched)}건 (유입 매체에 없음, 집계 제외)</span>`:'')
@@ -770,10 +775,11 @@ async function leadReload(){
   $('#leadMsg').textContent='조회 중…';
   try{
     const a={p_from:f.from,p_to:f.to,p_basis:f.basis,p_brands:brands};
-    const [L0,LM,LC,LB,LMB,LPL,LD,LT]=await Promise.all([
+    const ldDim=$('#ldDim').value||'media_brand';
+    const [L0,LM,LC,LB,LMB,LPL,LD,LT,LDM]=await Promise.all([
       rpc('fn_leadtime',{...a,p_dim:'all'}), rpc('fn_leadtime',{...a,p_dim:'media'}), rpc('fn_leadtime',{...a,p_dim:'car'}), rpc('fn_leadtime',{...a,p_dim:'car_brand'}),
-      rpc('fn_leadtime',{...a,p_dim:'media_brand'}), rpc('fn_leadtime',{...a,p_dim:'platform'}), rpc('fn_leadtime_dist',a), rpc('fn_leadtime_trend',{...a,p_grain:grain})]);
-    Object.assign(DASH,{L0,LM,LC,LB,LMB,LPL,LD,LT}); renderLead({L0,LM,LC,LB,LD,LMB,LPL,LT}); $('#leadMsg').textContent = brands? `브랜드: ${brands.join(', ')}` : '';
+      rpc('fn_leadtime',{...a,p_dim:'media_brand'}), rpc('fn_leadtime',{...a,p_dim:'platform'}), rpc('fn_leadtime_dist',a), rpc('fn_leadtime_trend',{...a,p_grain:grain}), rpc('fn_leadtime_dist_by',{...a,p_dim:ldDim})]);
+    Object.assign(DASH,{L0,LM,LC,LB,LMB,LPL,LD,LT,LDM,ldDim}); renderLead({L0,LM,LC,LB,LD,LMB,LPL,LT}); $('#leadMsg').textContent = brands? `브랜드: ${brands.join(', ')}` : '';
   }catch(e){ $('#leadMsg').textContent='실패: '+sqlErr(e); }
 }
 document.querySelectorAll('#fLeadGrain input').forEach(r=>r.onchange=leadReload);
@@ -789,10 +795,7 @@ function renderLead({L0, LM, LC, LB, LD, LMB, LPL, LT}){
       options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true,title:{display:true,text:'일'}},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},title:{display:true,text:'건'}}}}});
     $('#ltKpis').innerHTML=[['계약 건수(정상)',fmt(lt.n)],['평균',fmt(lt.avg_days,1)+'일'],['중앙값',fmt(lt.median_days,1)+'일'],['25% / 75%',fmt(lt.p25,0)+' / '+fmt(lt.p75,0)+'일'],['7일 이내 비율',fmt(lt.within7_pct,1)+'%']]
       .map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${lt.n?k[1]:'-'}</div></div>`).join('');
-    const ldN=LD.filter(x=>!x.bucket.startsWith('제외')); const ldTot=ldN.reduce((a,x)=>a+x.n,0)||1; const ldEx=LD.filter(x=>x.bucket.startsWith('제외')).reduce((a,x)=>a+x.n,0);
-    const ldCols=['#1e40af','#2563eb','#3b82f6','#60a5fa','#93c5fd','#f59e0b','#ef4444']; let cum=0; const ldMax=Math.max(...ldN.map(x=>x.n),1);
-    $('#ldBars').innerHTML = ldN.map((x,i)=>{ cum+=x.n; const pc=100*x.n/ldTot, cp=100*cum/ldTot; return `<div class="carrow"><span class="nm" style="width:70px;font-weight:600">${esc(x.bucket)}</span><div class="cbar" style="height:18px"><div style="width:${(100*x.n/ldMax).toFixed(1)}%;background:${ldCols[i%ldCols.length]}"></div></div><span class="val" style="width:230px">${fmt(x.n)}건 · <b>${fmt(pc,1)}%</b> · 누적 ${fmt(cp,1)}%</span></div>`; }).join('')
-      + `<div class="muted" style="margin-top:6px">정상 계약 ${fmt(ldTot)}건 기준 · 제외 ${fmt(ldEx)}건(음수·1년 초과) · 누적 = 해당 구간까지 계약된 비율</div>`;
+    renderLeadDist();
     const ltRow = x => [esc(x.dim_value??'(없음)'), fmt(x.n), fmt(x.avg_days,1), fmt(x.median_days,1), fmt(x.p25,0)+' / '+fmt(x.p75,0), fmt(x.within7_pct,1)+'%'];
     const LTH=['구분','건수','평균(일)','중앙값(일)','25%/75%','7일내'];
     renderTable('tLeadBrand', LTH, LB.map(ltRow));
@@ -800,6 +803,91 @@ function renderLead({L0, LM, LC, LB, LD, LMB, LPL, LT}){
     renderTable('tLeadPlatform', LTH, LPL.map(ltRow));
     renderTable('tLeadMedia', LTH, LM.filter(x=>x.n>=5).map(ltRow));
     renderTable('tLeadCar', LTH, LC.filter(x=>x.n>=5).map(ltRow));
+    renderLeadInsights({lt, LT:LT||[], LD, LB, LMB, LPL, grain, f:DASH.f||{}});
+}
+const LD_BUCKETS=['0일','1-3일','4-7일','8-14일','15-30일','31-60일','61일+'];
+const LD_COLS=['#1e40af','#2563eb','#3b82f6','#60a5fa','#93c5fd','#f59e0b','#ef4444'];
+const LD_DIMS={media:'유입매체',media_brand:'자사 브랜드',platform:'플랫폼',media_type:'매체유형'};
+async function ldDimChange(){
+  const f=DASH.f; if(!f) return; const dim=$('#ldDim').value; const brands=leadSel()||(f.brands.length?f.brands:null);
+  $('#leadMsg').textContent='분포 조회 중…';
+  try{ DASH.LDM=await rpc('fn_leadtime_dist_by',{p_from:f.from,p_to:f.to,p_basis:f.basis,p_dim:dim,p_brands:brands}); DASH.ldDim=dim; $('#ldVal').value=''; renderLeadDist(); $('#leadMsg').textContent=''; }
+  catch(e){ $('#leadMsg').textContent='실패: '+sqlErr(e); }
+}
+function renderLeadDist(){
+  const LD=DASH.LD||[], LDM=DASH.LDM||[], dim=DASH.ldDim||'media_brand', dimLabel=LD_DIMS[dim];
+  const g=new Map(); LDM.forEach(r=>{ const k=r.dim_value??'(없음)'; if(!g.has(k)) g.set(k,{k,n:0,b:{}}); const o=g.get(k); o.n+=r.n; o.b[r.bucket]=(o.b[r.bucket]||0)+r.n; });
+  const groups=[...g.values()].sort((a,b)=>b.n-a.n);
+  const vs=$('#ldVal'); const keep=vs.value;
+  vs.innerHTML='<option value="">전체</option>'+groups.filter(x=>x.n>=5).map(x=>`<option value="${esc(x.k)}">${esc(x.k)} (${fmt(x.n)}건)</option>`).join('');
+  vs.value=[...vs.options].some(o=>o.value===keep)?keep:''; const sel=vs.value;
+  const ldAll=LD.filter(x=>!x.bucket.startsWith('제외')); const allTot=ldAll.reduce((a,x)=>a+x.n,0)||1; const ex=LD.filter(x=>x.bucket.startsWith('제외')).reduce((a,x)=>a+x.n,0);
+  let rows, tot, note;
+  if(sel){ const o=g.get(sel); rows=LD_BUCKETS.map(b=>({bucket:b,n:o?.b[b]||0})); tot=rows.reduce((a,x)=>a+x.n,0); note=`${esc(dimLabel)} <b>${esc(sel)}</b> 정상 계약 ${fmt(tot)}건 기준 · 괄호는 전체 ${fmt(allTot)}건의 비율`; }
+  else { rows=LD_BUCKETS.map(b=>({bucket:b,n:ldAll.find(x=>x.bucket===b)?.n||0})); tot=rows.reduce((a,x)=>a+x.n,0); note=`정상 계약 ${fmt(tot)}건 기준 · 제외 ${fmt(ex)}건(음수·1년 초과)`; }
+  const mx=Math.max(...rows.map(x=>x.n),1); const t=tot||1; let cum=0;
+  $('#ldBars').innerHTML = rows.map((x,i)=>{ cum+=x.n; const pc=100*x.n/t, cp=100*cum/t; const ap=100*(ldAll.find(y=>y.bucket===x.bucket)?.n||0)/allTot; const d=pc-ap;
+      const cmp = sel? ` <span class="muted">(전체 ${fmt(ap,1)}% · ${d>=0?'+':''}${fmt(d,1)}%p)</span>` : '';
+      return `<div class="carrow"><span class="nm" style="width:70px;font-weight:600">${esc(x.bucket)}</span><div class="cbar" style="height:18px"><div style="width:${(100*x.n/mx).toFixed(1)}%;background:${LD_COLS[i]}"></div></div><span class="val" style="width:${sel?330:230}px">${fmt(x.n)}건 · <b>${fmt(pc,1)}%</b>${cmp} · 누적 ${fmt(cp,1)}%</span></div>`; }).join('')
+    + `<div class="muted" style="margin-top:6px">${note} · 누적 = 해당 구간까지 계약된 비율</div>`;
+  const stats = dim==='media'? (DASH.LM||[]) : dim==='media_brand'? (DASH.LMB||[]) : dim==='platform'? (DASH.LPL||[]) : [];
+  const med=k=>{ const s=stats.find(x=>(x.dim_value??'(플랫폼 미지정)')===k); return s? s.median_days : null; };
+  const cmp=groups.filter(x=>x.n>=30).slice(0,15);
+  $('#ldCmpTitle').textContent=`${dimLabel}별 리드타임 분포 비교`;
+  chart('chLeadDist',{type:'bar',data:{labels:cmp.map(x=>{ const m=med(x.k); return [x.k, `${fmt(x.n)}건${m!=null?` · 중앙값 ${fmt(m,0)}일`:''}`]; }),
+      datasets:LD_BUCKETS.map((b,i)=>({label:b,data:cmp.map(x=>+(100*(x.b[b]||0)/x.n).toFixed(1)),backgroundColor:LD_COLS[i],stack:'s'}))},
+    options:{indexAxis:'y',plugins:{legend:{position:'bottom'},tooltip:{callbacks:{title:items=>cmp[items[0].dataIndex].k, label:c=>`${c.dataset.label}: ${c.parsed.x}% (${fmt(cmp[c.dataIndex].b[c.dataset.label]||0)}건)`}}},scales:{x:{stacked:true,max:100,ticks:{callback:v=>v+'%'}},y:{stacked:true,ticks:{autoSkip:false,font:{size:11}}}}}});
+}
+function renderLeadInsights({lt, LT, LD, LB, LMB, LPL, grain, f}){
+  const out=[]; const add=(cls,title,body)=>out.push(`<div class="it ${cls}"><div><b>${title}</b>${body}</div></div>`);
+  const el=$('#ltInsights'); if(!el) return;
+  if(!lt.n){ el.innerHTML='<div class="it warn"><div><strong>리드타임 데이터 없음</strong>선택 기간·브랜드에 정상 계약(문의일자·계약일자 모두 있는 건)이 없습니다.</div></div>'; return; }
+  const basisInq = f.basis==='inquiry'; const brandSel = (leadSel()||(f.brands&&f.brands.length?f.brands:null));
+  const gl = grain==='month'?'월':grain==='week'?'주':'일';
+  // ① 기준 안내
+  add('', `기준: ${basisInq?'문의일자':'계약일자'} ${f.from||''}~${f.to||''}${brandSel?` · 브랜드 ${brandSel.join(', ')}`:' · 전체 브랜드'}`,
+    basisInq ? `기간 안에 <u>문의</u>한 고객 중 계약까지 간 ${fmt(lt.n)}건의 소요일입니다. 최근 문의는 아직 계약 전인 건이 빠져 있어 <strong>마지막 ${gl}은 실제보다 짧게</strong> 보입니다. 응대 속도 비교는 완료된 ${gl} 기준으로 보세요.`
+             : `기간 안에 <u>계약</u>된 ${fmt(lt.n)}건이 문의 후 며칠 만에 계약됐는지입니다. 문의 시점은 기간 이전일 수 있으며, 최근 ${gl}도 잘림 없이 비교 가능합니다.`);
+  // ② 대표값: 중앙값 vs 평균
+  const tot=LD.filter(x=>!x.bucket.startsWith('제외')).reduce((a,x)=>a+x.n,0)||1; const share=b=>100*(LD.find(x=>x.bucket===b)?.n||0)/tot;
+  const over30=share('31-60일')+share('61일+'), d0=share('0일');
+  if(lt.avg_days>=lt.median_days*2 && lt.avg_days-lt.median_days>=5)
+    add('warn', `평균 ${fmt(lt.avg_days,1)}일 vs 중앙값 ${fmt(lt.median_days,1)}일 — 평균은 소수 장기 건이 끌어올림`,
+      `계약의 절반은 <strong>${fmt(lt.median_days,0)}일 이내</strong>에 이뤄지지만 31일 넘게 걸린 건이 ${fmt(over30,1)}%라 평균이 크게 올라갑니다. 보고에는 <strong>중앙값</strong>과 "7일 이내 ${fmt(lt.within7_pct,1)}%"를 대표값으로 쓰는 것이 실제에 가깝습니다.`);
+  else add('', `평균 ${fmt(lt.avg_days,1)}일 · 중앙값 ${fmt(lt.median_days,1)}일`, `평균과 중앙값 차이가 크지 않아 어느 쪽을 써도 무방합니다. 7일 이내 계약 비율 ${fmt(lt.within7_pct,1)}%.`);
+  // ③ 당일 계약(0일) 비중과 내부 채널
+  const same=LMB.filter(x=>x.n>=30 && x.median_days===0 && x.within7_pct>=85).sort((a,b)=>b.n-a.n);
+  const mk=LMB.filter(x=>x.n>=30 && x.median_days>0).sort((a,b)=>b.n-a.n)[0];
+  if(d0>=20 && same.length)
+    add('warn', `계약의 ${fmt(d0,1)}%는 문의 당일 계약 — 같은 날 등록되는 채널 영향`,
+      `${same.slice(0,3).map(x=>`${esc(x.dim_value??'(없음)')} ${fmt(x.n)}건`).join(', ')}처럼 문의와 계약이 같은 날 등록되는 채널이 전체 수치를 짧게 만듭니다. 광고 유입의 실제 소요일은 ${mk?`<strong>${esc(mk.dim_value)} 중앙값 ${fmt(mk.median_days,0)}일 · 7일 이내 ${fmt(mk.within7_pct,1)}%</strong>`:'자사 브랜드별 표의 마케팅 브랜드 행'}를 기준으로 보세요. 브랜드 선택으로 분리 조회할 수 있습니다.`);
+  // ④ 추이: 마지막 두 기간 비교 (문의일자 기준이면 마지막 기간 제외)
+  const T=LT.filter(x=>x.n>=20); const seq = basisInq? T.slice(0,-1) : T;
+  if(seq.length>=2){
+    const a=seq[seq.length-2], b=seq[seq.length-1]; const lab=p=> grain==='month'? p.slice(0,7) : p;
+    const dm=b.median_days-a.median_days, dw=b.within7_pct-a.within7_pct;
+    if(Math.abs(dm)>=1 || Math.abs(dw)>=3)
+      add(dm<0||dw>0?'good':'bad', `${lab(a.period)} → ${lab(b.period)}: 중앙값 ${fmt(a.median_days,0)}→${fmt(b.median_days,0)}일, 7일 이내 ${fmt(a.within7_pct,1)}%→${fmt(b.within7_pct,1)}%`,
+        (dm<0||dw>0) ? `계약까지 걸리는 시간이 <strong>짧아졌습니다</strong>. 응대·견적 회신 속도가 빨라졌거나 즉시 계약 성향의 유입(지인·재계약 등) 비중이 늘었을 수 있으니 브랜드별로 나눠 확인하세요.`
+                     : `계약까지 걸리는 시간이 <strong>길어졌습니다</strong>. 견적 대기·출고 지연·상담 인력 부족 중 어디서 밀리는지 점검이 필요합니다. 리드타임이 길어지면 당월 ROAS도 낮게 보입니다.`);
+    else add('', `${lab(a.period)} → ${lab(b.period)} 리드타임 안정`, `중앙값 ${fmt(b.median_days,0)}일, 7일 이내 ${fmt(b.within7_pct,1)}%로 전${gl} 대비 큰 변화가 없습니다.`);
+    const mx=seq.reduce((m,x)=>x.median_days>m.median_days?x:m), mn=seq.reduce((m,x)=>x.median_days<m.median_days?x:m);
+    if(mx.median_days-mn.median_days>=3) add('', `기간 내 편차: 가장 빠른 ${lab(mn.period)} ${fmt(mn.median_days,0)}일 · 가장 느린 ${lab(mx.period)} ${fmt(mx.median_days,0)}일`, `${gl}별 중앙값이 ${fmt(mx.median_days-mn.median_days,0)}일 차이 납니다. 느린 ${gl}의 유입 구성(브랜드·플랫폼)을 비교하면 원인을 좁힐 수 있습니다.`);
+  }
+  // ⑤ 플랫폼·차량 브랜드 비교
+  const pl=LPL.filter(x=>x.n>=50 && x.dim_value); if(pl.length>=2){
+    const fast=[...pl].sort((a,b)=>a.median_days-b.median_days||b.within7_pct-a.within7_pct)[0], slow=[...pl].sort((a,b)=>b.median_days-a.median_days||a.within7_pct-b.within7_pct)[0];
+    if(slow.median_days-fast.median_days>=3) add('', `플랫폼: ${esc(slow.dim_value)} 중앙값 ${fmt(slow.median_days,0)}일로 가장 느림 (${esc(fast.dim_value)} ${fmt(fast.median_days,0)}일)`,
+      `${esc(slow.dim_value)} 유입은 바로 계약하기보다 비교·탐색 단계의 고객이 많다는 뜻입니다. 이 채널은 문의 후 ${fmt(slow.p75,0)}일(75% 지점)까지 후속 연락 일정을 잡아야 놓치지 않고, 성과 평가도 최소 그만큼 기다린 뒤 해야 공정합니다.`);
+  }
+  const cb=LB.filter(x=>x.n>=50 && x.dim_value); if(cb.length>=2){
+    const fast=[...cb].sort((a,b)=>a.median_days-b.median_days||b.within7_pct-a.within7_pct)[0], slow=[...cb].sort((a,b)=>b.median_days-a.median_days||a.within7_pct-b.within7_pct)[0];
+    if(slow.median_days-fast.median_days>=3) add('', `차량 브랜드: ${esc(slow.dim_value)} ${fmt(slow.median_days,0)}일 vs ${esc(fast.dim_value)} ${fmt(fast.median_days,0)}일`,
+      `${esc(slow.dim_value)} 계약은 결정까지 오래 걸립니다(7일 이내 ${fmt(slow.within7_pct,1)}%). 재고·출고 일정이나 견적 복잡도가 원인일 수 있어, 해당 브랜드 문의는 긴 팔로업 시나리오가 필요합니다.`);
+  }
+  // ⑥ 장기 꼬리
+  if(over30>=8) add('', `31일 이상 걸린 계약 ${fmt(over30,1)}%`, `한 달 넘게 고민한 뒤 계약한 고객이 ${fmt(tot*over30/100,0)}건입니다. 문의 후 2~4주 시점의 재접촉(견적 갱신·프로모션 안내)이 이 구간 전환을 앞당길 여지가 있습니다.`);
+  el.innerHTML=out.join('');
 }
 
 /* ============================ 업로드 ============================ */
