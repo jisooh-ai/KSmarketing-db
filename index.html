@@ -781,7 +781,10 @@ async function loadDash(){
     { const sel=$('#chBrandSel'); const keep=sel.value; const byCost=new Map(); (CH||[]).forEach(r=>byCost.set(r.brand,(byCost.get(r.brand)||0)+ +r.cost));
       const bl=[...byCost.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
       sel.innerHTML=bl.map(b=>`<option value="${esc(b)}">${esc(b)}${byCost.get(b)?` (${won(byCost.get(b))})`:''}</option>`).join('');
-      sel.value = bl.includes(keep)? keep : (bl[0]||''); renderChannel(); }
+      sel.value = bl.includes(keep)? keep : (bl[0]||'');
+      if(CH===undefined){ $('#chNote').innerHTML='<span class="pill warn">서버 미적용</span> migrations/2026-10-30_02_채널단위_ROAS.sql 을 Supabase 에서 실행한 뒤 [조회]를 다시 누르세요'; $('#tChannel').innerHTML=''; }
+      else if(!bl.length){ $('#chNote').innerHTML='<span class="pill warn">채널 집계 없음</span> 설정 탭 → [집계 갱신] 후 다시 조회하세요'; $('#tChannel').innerHTML=''; }
+      else renderChannel(); }
     const chKeys=CHANNELS.filter(c=>Sf.some(r=>r.channel===c)).concat([...new Set(Sf.map(r=>r.channel))].filter(c=>!CHANNELS.includes(c)));
     const chRows=[...bySB.entries()].map(([b,rows])=>{ const m={}; rows.forEach(r=>{ m[r.channel]=(m[r.channel]||0)+ +r.cost; }); const tot=Object.values(m).reduce((a,x)=>a+x,0); return [esc(b), won(tot), ...chKeys.map(c=>m[c]?won(m[c]):'-')]; });
     renderTable('tSpendCh', ['브랜드','광고비 합계',...chKeys], chRows, {foot:['합계', won(s.cost), ...chKeys.map(c=>won(Sf.filter(r=>r.channel===c).reduce((a,r)=>a+ +r.cost,0)))]});
