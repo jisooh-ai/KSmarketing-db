@@ -1131,7 +1131,7 @@ async function saveSpend(){
 async function spendSyncStatus(){
   try{ const {data}=await sb.from('ad_spend').select('synced_at,spend_date').eq('source','api').order('synced_at',{ascending:false}).limit(1);
     const {count}=await sb.from('ad_spend').select('*',{count:'exact',head:true}).eq('source','api');
-    $('#spSyncStat').innerHTML = (data&&data[0])? `마지막 자동 수집: <b>${data[0].synced_at.slice(0,16).replace('T',' ')}</b> · API 행 ${fmt(count||0)}건 (광고비 내역에 <span class="pill ok">API</span> 배지)` : '아직 자동 수집된 광고비가 없습니다. 원장 패치가 적용되면 매일 아침 들어옵니다.';
+    $('#spSyncStat').innerHTML = (data&&data[0])? `마지막 자동 수집: <b>${new Date(data[0].synced_at).toLocaleString('sv-SE',{timeZone:'Asia/Seoul'}).slice(0,16)}</b> · API 행 ${fmt(count||0)}건 (광고비 내역에 <span class="pill ok">API</span> 배지)` : '아직 자동 수집된 광고비가 없습니다. 원장 패치가 적용되면 매일 아침 들어옵니다.';
   }catch(e){ $('#spSyncStat').textContent='상태 조회 실패: '+sqlErr(e); }
   try{ $('#spSyncUrl').value = localStorage.getItem('spSyncUrl')||'https://ks-inflow-db.vercel.app'; $('#spSyncToken').value = localStorage.getItem('spSyncToken')||''; }catch{}
   if(!$('#spSyncTo').value){ const t=new Date(); const a=new Date(t); a.setDate(t.getDate()-1); const b=new Date(t); b.setDate(t.getDate()-7); $('#spSyncTo').value=a.toISOString().slice(0,10); $('#spSyncFrom').value=b.toISOString().slice(0,10); }
@@ -1151,7 +1151,7 @@ async function loadSpend(){
   let q=sb.from('ad_spend').select('*').gte('spend_date',from).lte('spend_date',to); const b=$('#spListBrand').value; if(b) q=q.eq('brand',b);
   const {data,error}=await q.order('spend_date',{ascending:false}).order('brand').order('channel').limit(5000); if(error) return toast(sqlErr(error));
   const tot=data.reduce((a,r)=>a+ +r.cost,0);
-  const srcPill=r=> r.source&&r.source!=='수기' ? `<span class="pill ok" title="인입 DB 원장에서 매체 API로 자동 수집 (${r.synced_at? r.synced_at.slice(0,16).replace('T',' '):''})">API</span>` : '<span class="muted">수기</span>';
+  const srcPill=r=> r.source&&r.source!=='수기' ? `<span class="pill ok" title="인입 DB 원장에서 매체 API로 자동 수집 (${r.synced_at? new Date(r.synced_at).toLocaleString('sv-SE',{timeZone:'Asia/Seoul'}).slice(0,16):''})">API</span>` : '<span class="muted">수기</span>';
   renderTable('tSpend', ['일자','브랜드','채널','광고비','출처','노출','클릭','메모',''], data.map(r=>[r.spend_date, esc(r.brand), esc(r.channel), fmt(r.cost), srcPill(r), fmt(r.impressions), fmt(r.clicks), esc(r.memo||''), `<button class="btn sec sm" onclick="delSpend('${r.spend_date}','${esc(r.brand).replace(/'/g,"\\'")}','${esc(r.channel).replace(/'/g,"\\'")}')">삭제</button>`]), {left:[0,1,2,4,7], foot:['합계','','',fmt(tot),'','','','','']});
 }
 async function delSpend(d,b,c){ if(!confirm(`${d} ${b} ${c} 광고비를 삭제할까요?`)) return; const {error}=await sb.from('ad_spend').delete().eq('spend_date',d).eq('brand',b).eq('channel',c); if(error) return toast(sqlErr(error)); loadSpend(); }
