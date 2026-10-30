@@ -30,6 +30,7 @@
   section.page.on{display:block}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
   .card h2{font-size:15px;margin:0 0 10px}
+  .per{display:inline-block;font-size:11px;font-weight:500;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:1px 8px;margin-left:8px;vertical-align:middle;white-space:nowrap}
   .card h3{font-size:13px;margin:14px 0 6px;color:var(--muted)}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
   .row>div{display:flex;flex-direction:column;gap:3px}
@@ -657,7 +658,7 @@ function trendMediaFill(){ if(!DASH.Pall) return; const sel=trendSel(); const ro
   const list=[...by.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]); const keep=msSel('msTrendMedia');
   const el=$('#msTrendMedia'); el.querySelector('.list').innerHTML=list.map(m=>`<label><input type="checkbox" value="${esc(m)}" ${keep.includes(m)?'checked':''}>${esc(m)} <span class="muted">(${fmt(by.get(m))})</span></label>`).join('');
   el.querySelectorAll('input').forEach(i=>i.onchange=()=>{ msLabel('msTrendMedia'); trendRefilter(); }); msLabel('msTrendMedia'); }
-function trendRefilter(){ if(!DASH.Pall) return; trendMediaFill(); const Pt=trendFilter(DASH.Pall); renderTrend(Pt, DASH.f, sumRows(Pt, DASH.f, trendSpend())); renderTrendMedia(); }
+function trendRefilter(){ if(!DASH.Pall) return; trendMediaFill(); const Pt=trendFilter(DASH.Pall); renderTrend(Pt, DASH.f, sumRows(Pt, DASH.f, trendSpend())); renderTrendMedia(); stampPeriods(); }
 // 매체별 추이 비교 (선택 매체 또는 선택 브랜드 내 DB 상위 6개)
 function renderTrendMedia(){
   const f=DASH.f; const metric=$('#tmMetric').value; const sel=trendSel(); const ms=trendMediaSel();
@@ -672,6 +673,18 @@ function renderTrendMedia(){
   const lab={dbSel:'DB('+f.dbLabel+')',contracts:'계약수',cv:'전환율(%)',revenue:'실행매출'}[metric];
   $('#tmNote').textContent = medias.length? `${ms?'선택 매체':'DB 상위'} ${medias.length}개 · ${lab}` : '표시할 매체가 없습니다';
   chart('chTrendMedia',{data:{labels:periods.map(plabel),datasets:ds},options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom'},tooltip:{callbacks:{title:items=>items[0]?.label, label:c=>`${medias[c.datasetIndex]}: ${metric==='cv'? c.parsed.y+'%' : metric==='revenue'? won(c.parsed.y) : fmt(c.parsed.y)}`}}},scales:{y:{beginAtZero:true,ticks:{callback:v=> metric==='cv'? v+'%' : metric==='revenue'? won(v) : fmt(v)}}}}});
+}
+// 조회 조건 꼬리표: 대시보드 모든 카드 제목에 "기간 · 기준일 · 중복 기준 · 브랜드" 표시
+function periodTag(extra){ const f=DASH.f; if(!f) return ''; const b = f.brands&&f.brands.length? (f.brands.length===1? f.brands[0] : `${f.brands.length}개 브랜드`) : '전체 브랜드'; return `${f.from} ~ ${f.to} · ${f.basis==='inquiry'?'문의일자':'계약일자'} 기준 · ${f.dbLabel} · ${b}${extra?' · '+extra:''}`; }
+function stampPeriods(){
+  document.querySelectorAll('#p-dash .card > h2, #p-dash .card > div > h2').forEach(h=>{
+    let tag=h.querySelector('.per'); if(!tag){ tag=document.createElement('span'); tag.className='per'; h.appendChild(tag); }
+    const card=h.closest('.card'); let extra='';
+    if(card.querySelector('#msTrend')){ const g=document.querySelector('#fGrain input:checked')?.value; const tb=trendSel(), tm=trendMediaSel(); extra=[{month:'월별',week:'주별',day:'일별',year:'연별'}[g]||'', tb?`추이 브랜드 ${tb.length===1?tb[0]:tb.length+'개'}`:'', tm?`매체 ${tm.length===1?tm[0]:tm.length+'개'}`:''].filter(Boolean).join(' · '); }
+    if(card.querySelector('#msLead')){ const lb=leadSel(); const g=document.querySelector('#fLeadGrain input:checked')?.value; extra=[{month:'월별',week:'주별',day:'일별'}[g]||'', lb?`리드타임 브랜드 ${lb.length===1?lb[0]:lb.length+'개'}`:''].filter(Boolean).join(' · '); }
+    if(card.querySelector('#chBrandSel')){ extra='브랜드 '+($('#chBrandSel').value||'-'); }
+    tag.textContent=periodTag(extra); tag.title='이 카드의 숫자가 집계된 조건';
+  });
 }
 function renderTrend(Pf, f, s){
     const Sp=trendSpend(); const bySP=groupBy(Sp, r=>r.period);
@@ -811,6 +824,7 @@ async function loadDash(){
     chart('chCarBrandCv',{type:'bar',data:{labels:cbCv.map(x=>x.k),datasets:[{label:'전환율(%)',data:cbCv.map(x=>+x.cv.toFixed(1)),backgroundColor:cbCv.map(x=>BRAND_COLORS[x.k]||hashColor(x.k))}]},options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.x}% (계약 ${fmt(cbCv[c.dataIndex].c)} / DB ${fmt(cbCv[c.dataIndex].d)})`}}},scales:{x:{beginAtZero:true,ticks:{callback:v=>v+'%'}}}}});
 
     renderLead({L0, LM, LC, LB, LD, LMB, LPL, LT});
+    stampPeriods();
   }catch(e){ $('#status').innerHTML='<span class="pill bad">오류</span> '+esc(sqlErr(e)); }
   finally{ loading(false); btn.disabled=false; }
 }
@@ -849,6 +863,7 @@ function renderChannel(){
     rows.map(r=>[esc(r.ch), r.cost?won(r.cost):'-', r.fee?won(r.fee):'-', fmt(r.db), fmt(r.dbSel), fmt(r.c), won(r.rev), cell(roas(r), v=>fmt(v,1)+'%', paid.includes(r)?oR:null), r.cost&&r.dbSel? cell(r.cost/r.dbSel, v=>won(v), oC):'-', r.cost&&r.c? won(r.cost/r.c):'-', pct(r.c,r.dbSel)]),
     {left:[0], foot:['합계', won(tot.cost), won(tot.fee), fmt(tot.db), fmt(tot.dbSel), fmt(tot.c), won(tot.rev), tot.cost?fmt(100*tot.rev/tot.cost,1)+'%':'-', tot.cost&&tot.dbSel?won(tot.cost/tot.dbSel):'-', tot.cost&&tot.c?won(tot.cost/tot.c):'-', pct(tot.c,tot.dbSel)]});
   const unm=rows.filter(r=>r.ch==='(미분류)'||r.ch==='사이트(링크 없음)').reduce((a,r)=>a+r.c,0);
+  stampPeriods();
   $('#chNote').textContent = brand? `광고비 있는 채널 ${paid.length}개 · ROAS 중앙값 ${medR!=null?fmt(medR,0)+'%':'-'}${unm?` · 링크 없는 계약 ${fmt(unm)}건은 채널 미배정`:''}` : '브랜드를 선택하세요';
   const col=ch=>CH_COLORS2[ch]||hashColor(ch);
   chart('chChanRoas',{type:'bar',data:{labels:paid.map(r=>r.ch),datasets:[{label:'ROAS(%)',data:paid.map(r=>+roas(r).toFixed(0)),backgroundColor:paid.map(r=>col(r.ch))}]},
@@ -930,7 +945,7 @@ function renderLead({L0, LM, LC, LB, LD, LMB, LPL, LT}){
     $('#ltKpis').innerHTML=[['계약 건수(정상)',fmt(lt.n), dd('n',true)],['평균',fmt(lt.avg_days,1)+'일', dd('avg_days',false)],['중앙값',fmt(lt.median_days,1)+'일', dd('median_days',false)],['25% / 75%',fmt(lt.p25,0)+' / '+fmt(lt.p75,0)+'일', dd('p75',false)],['7일 이내 비율',fmt(lt.within7_pct,1)+'%', ddp('within7_pct')]]
       .map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${lt.n?k[1]:'-'}</div>${lt.n?k[2]:''}</div>`).join('')
       + (mom.b? `<div class="kpi" style="background:#f8fafc"><div class="l">전월 대비 기준</div><div class="v" style="font-size:13px;font-weight:600">${mom.lab}</div><div class="muted" style="font-size:11px">완료된 두 달의 ${f0.basis==='inquiry'?'문의':'계약'}월 비교 · 초록 = 개선(소요일은 줄수록)</div></div>` : '');
-    renderLeadDist(); renderCohort();
+    renderLeadDist(); renderCohort(); stampPeriods();
     const ltRow = x => [esc(x.dim_value??'(없음)'), fmt(x.n), fmt(x.avg_days,1), fmt(x.median_days,1), fmt(x.p25,0)+' / '+fmt(x.p75,0), fmt(x.within7_pct,1)+'%'];
     const LTH=['구분','건수','평균(일)','중앙값(일)','25%/75%','7일내'];
     renderTable('tLeadBrand', LTH, LB.map(ltRow));
