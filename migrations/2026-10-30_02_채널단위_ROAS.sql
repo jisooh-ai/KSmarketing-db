@@ -186,8 +186,5 @@ returns jsonb language sql stable as $$
   )
 $$;
 
--- 9) 채널 집계가 비어 있으면 1회 생성
-do $$ begin
-  if (select count(*) from public.agg_inquiry_channel) = 0 and (select count(*) from public.inquiries) > 0 then perform public.fn_refresh_agg(); end if;
-end $$;
+-- 9) 채널 집계 생성은 SQL Editor 시간 제한 때문에 여기서 하지 않음 → 실행 후 웹 설정 탭 [집계 갱신] (또는 별도로 select public.fn_refresh_agg();)
 notify pgrst, 'reload schema';
