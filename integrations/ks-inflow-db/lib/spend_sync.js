@@ -1,8 +1,10 @@
 // 광고비 원장(광고비_YYYY-MM 탭) → 마케팅 퍼포먼스 DB(Supabase ad_spend) 동기화
 //
 // 필요한 설정 (Vercel → Settings → Environment Variables) — os_sync.js 와 같은 값을 그대로 씁니다
-//   SUPABASE_URL              : https://qhlygfqetcfnoialihyc.supabase.co
-//   SUPABASE_SERVICE_ROLE_KEY : Supabase 비밀 키 (service_role)  ※ 절대 index.html 등 화면 코드에 넣지 않음
+//   PERF_SUPABASE_URL              : https://qhlygfqetcfnoialihyc.supabase.co  (퍼포먼스 DB)
+//   PERF_SUPABASE_SERVICE_ROLE_KEY : 그 프로젝트의 service_role 비밀 키  ※ 절대 화면 코드에 넣지 않음
+//   (PERF_* 가 없으면 os_sync 와 같은 SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 를 사용 — 마케팅 OS 와 같은 프로젝트일 때만 유효)
+//   SPEND_SYNC_TOKEN               : 퍼포먼스 DB 화면 [지금 가져오기] 인증 토큰
 //   SPEND_SYNC                : 'off' 로 두면 동기화를 건너뜀 (기본: 켜짐)
 //
 // 동작
@@ -43,8 +45,9 @@ const UNBRANDED = '(브랜드 없음)';
 
 function config() {
   if (String(process.env.SPEND_SYNC || '').trim().toLowerCase() === 'off') return null;
-  const url = String(process.env.SUPABASE_URL || '').trim();
-  const key = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  // 퍼포먼스 DB 전용 변수(PERF_*)가 있으면 우선, 없으면 os_sync 와 같은 SUPABASE_* 사용 (두 DB 가 같은 프로젝트일 때)
+  const url = String(process.env.PERF_SUPABASE_URL || process.env.SUPABASE_URL || '').trim();
+  const key = String(process.env.PERF_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
   if (!url || !key) return null;
   try { return { base: new URL(url).origin + '/rest/v1', key }; } catch { return null; }
 }

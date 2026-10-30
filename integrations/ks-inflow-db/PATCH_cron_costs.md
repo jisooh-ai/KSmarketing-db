@@ -42,8 +42,9 @@ const spendSync = require('../lib/spend_sync');
 ## Vercel 환경 변수
 - `SPEND_SYNC_TOKEN` = 임의의 긴 비밀 문자열 (퍼포먼스 DB 화면 [지금 가져오기] 버튼용 — 같은 값을 그 화면 토큰 칸에 입력)
 - `SPEND_SYNC_ORIGIN` = https://jisooh-ai.github.io (기본값이므로 생략 가능)
-- `SUPABASE_URL` = https://qhlygfqetcfnoialihyc.supabase.co  (os_sync 와 같은 변수라면 이미 있음)
-- `SUPABASE_SERVICE_ROLE_KEY` = Supabase → Settings → API → service_role (secret)
+- `PERF_SUPABASE_URL` = https://qhlygfqetcfnoialihyc.supabase.co (퍼포먼스 DB)
+- `PERF_SUPABASE_SERVICE_ROLE_KEY` = 그 프로젝트 Settings → API → service_role
+  · 기존 `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`(마케팅 OS용)가 같은 프로젝트를 가리키면 PERF_* 는 생략 가능
 - (선택) `SPEND_SYNC=off` → 잠시 끄기
 
 ## 과거 데이터 한 번에 채우기 (배포 후, 브라우저 콘솔 또는 curl — 로그인 쿠키 필요)
