@@ -335,7 +335,9 @@
       <div><label>원장 주소</label><input id="spSyncUrl" style="min-width:260px" placeholder="https://ks-inflow-db.vercel.app"></div>
       <div><label>동기화 토큰 <span class="tip" title="원장 Vercel 환경변수 SPEND_SYNC_TOKEN 과 같은 값. 이 브라우저에만 저장됩니다">ⓘ</span></label><input id="spSyncToken" type="password" style="min-width:200px"></div>
       <div><button class="btn" onclick="spendSyncNow()">지금 가져오기</button></div>
+      <div><button class="btn sec" onclick="spendUnassigned()">브랜드 미지정 캠페인 보기</button></div>
     </div>
+    <div id="spUnassigned" style="margin-top:8px"></div>
     <div id="spSyncMsg" class="muted" style="margin-top:6px">매일 자동으로도 들어오므로 보통은 누를 필요가 없습니다. 과거 기간을 채우거나 방금 원장에서 수집한 값을 바로 반영할 때만 사용하세요.</div>
   </div>
   <div class="card">
@@ -1145,6 +1147,17 @@ async function spendSyncNow(){
     if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status));
     $('#spSyncMsg').innerHTML=`<span class="pill ok">완료</span> ${since}~${until} · ${fmt(j.rows||0)}행 전송 (일자×브랜드×채널, 수수료 포함) · 저장 ${fmt(j.sent||0)}행`; spendSyncStatus(); loadSpend();
   }catch(e){ $('#spSyncMsg').innerHTML=`<span class="pill bad">실패</span> ${esc(e.message)} — 원장 배포·토큰·CORS 설정을 확인하세요`; }
+}
+async function spendUnassigned(){
+  const url=($('#spSyncUrl').value||'').trim().replace(/\/$/,''), token=($('#spSyncToken').value||'').trim(), since=$('#spSyncFrom').value, until=$('#spSyncTo').value;
+  if(!url||!token) return toast('원장 주소와 동기화 토큰을 입력하세요'); if(!since||!until||since>until) return toast('기간을 확인하세요');
+  const box=$('#spUnassigned'); box.innerHTML='<span class="muted">원장에서 캠페인 목록 조회 중…</span>';
+  try{ const r=await fetch(`${url}/api/spend-sync?action=unassigned&since=${since}&until=${until}`,{headers:{'x-sync-token':token}}); const j=await r.json().catch(()=>({})); if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status));
+    const rows=j.rows||[]; const tot=rows.reduce((a,x)=>a+x.cost,0);
+    if(!rows.length){ box.innerHTML=`<span class="pill ok">미지정 없음</span> ${since}~${until} 광고비는 모두 브랜드가 배정돼 있습니다.`; return; }
+    box.innerHTML=`<div class="muted" style="margin-bottom:6px">${since}~${until} 브랜드 미지정 캠페인 <b>${fmt(rows.length)}개 · ${won(tot)}</b> — 원장의 <b>광고계정설정</b>(계정 전체가 한 브랜드) 또는 <b>광고비규칙</b>(캠페인명 포함 글자 → 브랜드)에 등록한 뒤 [지금 가져오기]로 다시 보내면 소급 반영됩니다.</div><div class="tw" style="max-height:360px"><table id="tSpUnassigned"></table></div>`;
+    renderTable('tSpUnassigned', ['매체','광고 계정','캠페인명','캠페인 ID','채널(퍼포먼스 DB)','광고비','일수'], rows.map(x=>[esc(x.platformLabel), esc(x.account), esc(x.campaign||'(이름 없음)'), esc(x.campaignId||''), esc(x.channel||''), fmt(x.cost), fmt(x.days)]), {left:[0,1,2,3,4], foot:['합계','','','','',fmt(tot),'']});
+  }catch(e){ box.innerHTML=`<span class="pill bad">실패</span> ${esc(e.message)}`; }
 }
 async function loadSpend(){
   const m=$('#spMonth').value; if(!m) return; const from=m+'-01'; const to=new Date(+m.slice(0,4), +m.slice(5,7), 0).toISOString().slice(0,10);

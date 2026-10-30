@@ -112,4 +112,25 @@ async function sync({ since, until }) {
   return { sent, rows: spend.length, months: [...months].sort(), since, until };
 }
 
-module.exports = { enabled, sync, toSpendRows, CHANNEL_MAP };
+/** 브랜드 미지정으로 판정된 캠페인 목록 (since~until, 금액순) — 원장 광고계정설정·광고비규칙 보완용 */
+async function unassigned({ since, until }) {
+  const cfg = C.cleanCostCfg(await costs.config());
+  const months = new Set();
+  for (let d = new Date(since + 'T00:00:00Z'); d <= new Date(until + 'T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() + 1, 1)) months.add(d.toISOString().slice(0, 7));
+  months.add(until.slice(0, 7));
+  let rows = [];
+  for (const m of months) rows = rows.concat(await costs.readMonth(m));
+  const agg = new Map();
+  for (const r of rows) {
+    if (!r.date || r.date < since || r.date > until) continue;
+    const v = Number(r.cost) || 0; if (!v) continue;
+    const z = C.resolveCost(r, cfg);
+    if (z.excluded || (z.brand && z.brand !== C.UNASSIGNED)) continue;
+    const k = `${r.platform}|${r.account}|${r.campaignId}`;
+    const o = agg.get(k) || { platform: r.platform, platformLabel: (C.PLATFORMS[r.platform] || {}).label || r.platform, account: r.account, campaignId: r.campaignId, campaign: r.campaign, channel: CHANNEL_MAP[z.bucket] || z.bucket, cost: 0, days: 0, why: z.why || '' };
+    o.cost += v; o.days += 1; agg.set(k, o);
+  }
+  return [...agg.values()].sort((a, b) => b.cost - a.cost).map((o) => ({ ...o, cost: Math.round(o.cost) }));
+}
+
+module.exports = { enabled, sync, unassigned, toSpendRows, CHANNEL_MAP };
