@@ -238,6 +238,13 @@
       <div><h3>계약 건수 · 7일 이내 비중 <span class="tip" title="막대 = 정상 계약 건수(표본 크기). 선 = 그 기간 계약 중 문의 후 7일 안에 계약된 비율">ⓘ</span></h3><canvas id="chLeadTrend2" style="max-height:280px"></canvas></div>
     </div>
     <details class="tbl"><summary>표로 보기</summary><div class="tw" style="margin-top:6px;max-height:260px"><table id="tLeadTrend"></table></div></details>
+    <div style="margin-top:14px"><h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">인입 DB 기준 단기 전환율 <span class="tip" title="문의한 DB(중복 제외 기준 적용) 중 7일 / 30일 안에 계약된 비율. 위 '7일 이내 비율'은 계약된 건 중 비율이고, 이 지표는 DB 전체가 분모라 매체 품질 비교에 적합. 문의월 기준이라 관찰 기간이 같음">ⓘ</span>
+      <select id="lqDim" style="padding:3px 6px;font-size:12px" onchange="lqDimChange()"><option value="media_brand">자사 브랜드</option><option value="media">유입매체</option><option value="platform">플랫폼</option></select>
+      <span class="muted" id="lqNote"></span></h3>
+      <div class="grid2">
+        <div><div class="tw" style="max-height:340px"><table id="tCohort"></table></div></div>
+        <div><h3 style="margin-top:0">문의월별 7일·30일 전환율 <span class="tip" title="문의월 코호트. 아직 30일(또는 7일)이 지나지 않은 달은 값이 작게 나오므로 점선·회색으로 표시">ⓘ</span></h3><canvas id="chCohort" style="max-height:300px"></canvas></div>
+      </div></div>
     <div class="grid2" style="margin-top:12px">
       <div><h3 style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">분포 <span class="tip" title="정상 계약 기준 구간별 건수·비율·누적비율. 구분을 고르면 아래 비교 차트가 바뀌고, 값을 고르면 그 매체(브랜드·플랫폼)만의 분포를 전체 비율과 나란히 보여줍니다">ⓘ</span>
         <select id="ldDim" style="padding:3px 6px;font-size:12px" onchange="ldDimChange()"><option value="media_brand">자사 브랜드</option><option value="media">유입매체</option><option value="platform">플랫폼</option><option value="media_type">매체유형</option></select>
@@ -684,14 +691,14 @@ async function loadDash(){
     if((D.status.inquiries>0 || D.status.car_unmapped>0) && (!(D.status.agg_rows>0) || !(D.status.agg_car_rows>0))){ loading(true,'집계 테이블이 비어 있어 갱신 중… (최초 1회, 10~60초)',50); await rpc('fn_refresh_agg',{}); loading(true,'다시 조회 중…',75); D = await rpc('fn_dashboard',args); }
     loading(true,'화면 그리는 중…',90);
     if(D.status.ip_pending>0) ipMigrateLoop(D.status.ip_pending);
-    const {status:st, P, M, S, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM} = D;
+    const {status:st, P, M, S, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM, LQ, LQT} = D;
     const took=((Date.now()-t0)/1000).toFixed(1);
     const inc = r => f.types.includes(r.media_type) && (!f.brands.length || f.brands.includes(brandOf(r)));
     const Pf=P.filter(inc), Mf=M.filter(inc); const Sf=(S||[]).filter(r=>!f.brands.length || f.brands.includes(r.brand));
     const PM=(PMraw||P).filter(inc);   // 월별 시리즈 (전월 대비·해석용)
     const SM=Sf.map(r=>({...r, period:String(r.period).slice(0,7)+'-01'}));
     if(st.brands && JSON.stringify(st.brands)!==JSON.stringify(BRANDS)){ BRANDS=st.brands; const keep=msSel('msBrand'); msFill('msBrand',BRANDS); document.querySelectorAll('#msBrand input').forEach(i=>i.checked=keep.includes(i.value)); msLabel('msBrand'); msFill('msTrend',BRANDS,trendRefilter); msFill('msDl',BRANDS); msFill('msLead',BRANDS,leadReload); if(!document.querySelector('#msSpend input')) msFill('msSpend',BRANDS); }
-    DASH={f, P:Pf, M:Mf, S:Sf, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM:LDM||[], ldDim:'media_brand'}; const ldd=$('#ldDim'); if(ldd) ldd.value='media_brand';
+    DASH={f, P:Pf, M:Mf, S:Sf, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM:LDM||[], ldDim:'media_brand', LQ:LQ||[], LQT:LQT||[], lqDim:'media_brand', st}; const ldd=$('#ldDim'); if(ldd) ldd.value='media_brand'; const lqd=$('#lqDim'); if(lqd) lqd.value='media_brand';
     const unc = M.filter(r=>r.media_type==='미분류').length;
     $('#status').innerHTML = `<span class="pill ok">조회 완료 ${took}초</span>` + (f.brands.length?` <span class="pill">브랜드: ${esc(f.brands.join(', '))}</span>`:'') + ` 유입 ${fmt(st.inquiries)}건 (${(st.inquiry_min||'').slice(0,10)} ~ ${(st.inquiry_max||'').slice(0,10)}) · 활성 매출 ${fmt(st.sales_active)}건 (계약일 ${st.contract_min||'-'} ~ ${st.contract_max||'-'}) · 광고비 입력 ${fmt(st.ad_spend_days)}일 (최근 ${st.ad_spend_max||'-'})`
       + (st.sales_unmatched? ` · <span class="pill warn">미매칭 매출 ${fmt(st.sales_unmatched)}건 (유입 매체에 없음, 집계 제외)</span>`:'')
@@ -838,7 +845,9 @@ async function leadReload(){
     const [L0,LM,LC,LB,LMB,LPL,LD,LT,LDM]=await Promise.all([
       rpc('fn_leadtime',{...a,p_dim:'all'}), rpc('fn_leadtime',{...a,p_dim:'media'}), rpc('fn_leadtime',{...a,p_dim:'car'}), rpc('fn_leadtime',{...a,p_dim:'car_brand'}),
       rpc('fn_leadtime',{...a,p_dim:'media_brand'}), rpc('fn_leadtime',{...a,p_dim:'platform'}), rpc('fn_leadtime_dist',a), rpc('fn_leadtime_trend',{...a,p_grain:grain}), rpc('fn_leadtime_dist_by',{...a,p_dim:ldDim})]);
-    Object.assign(DASH,{L0,LM,LC,LB,LMB,LPL,LD,LT,LDM,ldDim}); renderLead({L0,LM,LC,LB,LD,LMB,LPL,LT}); $('#leadMsg').textContent = brands? `브랜드: ${brands.join(', ')}` : '';
+    const lqDim=$('#lqDim').value||'media_brand'; const cq={p_from:f.from,p_to:f.to,p_brands:brands};
+    const [LQ,LQT]=await Promise.all([rpc('fn_leadtime_cohort',{...cq,p_dim:lqDim,p_grain:'all'}), rpc('fn_leadtime_cohort',{...cq,p_dim:'all',p_grain:'month'})]);
+    Object.assign(DASH,{L0,LM,LC,LB,LMB,LPL,LD,LT,LDM,ldDim,LQ,LQT,lqDim}); renderLead({L0,LM,LC,LB,LD,LMB,LPL,LT}); $('#leadMsg').textContent = brands? `브랜드: ${brands.join(', ')}` : '';
   }catch(e){ $('#leadMsg').textContent='실패: '+sqlErr(e); }
 }
 document.querySelectorAll('#fLeadGrain input').forEach(r=>r.onchange=leadReload);
@@ -867,7 +876,7 @@ function renderLead({L0, LM, LC, LB, LD, LMB, LPL, LT}){
     $('#ltKpis').innerHTML=[['계약 건수(정상)',fmt(lt.n), dd('n',true)],['평균',fmt(lt.avg_days,1)+'일', dd('avg_days',false)],['중앙값',fmt(lt.median_days,1)+'일', dd('median_days',false)],['25% / 75%',fmt(lt.p25,0)+' / '+fmt(lt.p75,0)+'일', dd('p75',false)],['7일 이내 비율',fmt(lt.within7_pct,1)+'%', ddp('within7_pct')]]
       .map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${lt.n?k[1]:'-'}</div>${lt.n?k[2]:''}</div>`).join('')
       + (mom.b? `<div class="kpi" style="background:#f8fafc"><div class="l">전월 대비 기준</div><div class="v" style="font-size:13px;font-weight:600">${mom.lab}</div><div class="muted" style="font-size:11px">완료된 두 달의 ${f0.basis==='inquiry'?'문의':'계약'}월 비교 · 초록 = 개선(소요일은 줄수록)</div></div>` : '');
-    renderLeadDist();
+    renderLeadDist(); renderCohort();
     const ltRow = x => [esc(x.dim_value??'(없음)'), fmt(x.n), fmt(x.avg_days,1), fmt(x.median_days,1), fmt(x.p25,0)+' / '+fmt(x.p75,0), fmt(x.within7_pct,1)+'%'];
     const LTH=['구분','건수','평균(일)','중앙값(일)','25%/75%','7일내'];
     renderTable('tLeadBrand', LTH, LB.map(ltRow));
@@ -911,6 +920,36 @@ function renderLeadDist(){
   chart('chLeadDist',{type:'bar',data:{labels:cmp.map(x=>{ const m=med(x.k); return [x.k, `${fmt(x.n)}건${m!=null?` · 중앙값 ${fmt(m,0)}일`:''}`]; }),
       datasets:LD_BUCKETS.map((b,i)=>({label:b,data:cmp.map(x=>+(100*(x.b[b]||0)/x.n).toFixed(1)),backgroundColor:LD_COLS[i],stack:'s'}))},
     options:{indexAxis:'y',plugins:{legend:{position:'bottom'},tooltip:{callbacks:{title:items=>cmp[items[0].dataIndex].k, label:c=>`${c.dataset.label}: ${c.parsed.x}% (${fmt(cmp[c.dataIndex].b[c.dataset.label]||0)}건)`}}},scales:{x:{stacked:true,max:100,ticks:{callback:v=>v+'%'}},y:{stacked:true,ticks:{autoSkip:false,font:{size:11}}}}}});
+}
+async function lqDimChange(){
+  const f=DASH.f; if(!f) return; const dim=$('#lqDim').value; const brands=leadSel()||(f.brands.length?f.brands:null);
+  $('#lqNote').textContent='조회 중…';
+  try{ DASH.LQ=await rpc('fn_leadtime_cohort',{p_from:f.from,p_to:f.to,p_dim:dim,p_grain:'all',p_brands:brands}); DASH.lqDim=dim; renderCohort(); }
+  catch(e){ $('#lqNote').textContent='실패: '+sqlErr(e); }
+}
+function renderCohort(){
+  const f=DASH.f||{}; const LQ=DASH.LQ||[], LQT=DASH.LQT||[]; const dim=DASH.lqDim||'media_brand'; const dimLabel={media_brand:'자사 브랜드',media:'유입매체',platform:'플랫폼'}[dim];
+  const dbOf=r=> +(r[f.dbField]??r.db_count??0);
+  const rows=LQ.map(r=>({k:r.dim_value??'(없음)', db:dbOf(r), c7:+r.c7, c30:+r.c30, ca:+r.c_all})).filter(r=>r.db>=30).sort((a,b)=>b.db-a.db);
+  const tot=rows.reduce((a,r)=>({db:a.db+r.db,c7:a.c7+r.c7,c30:a.c30+r.c30,ca:a.ca+r.ca}),{db:0,c7:0,c30:0,ca:0});
+  const pc=(n,d)=> d? fmt(100*n/d,2)+'%' : '-';
+  const med7=median(rows.map(r=>100*r.c7/r.db)), med30=median(rows.map(r=>100*r.c30/r.db));
+  const cell=(n,d,m)=>{ if(!d) return '-'; const v=100*n/d; return `<span class="${v>=m*1.2?'up':v<=m*0.8?'down':''}" style="font-weight:600">${fmt(v,2)}%</span>`; };
+  renderTable('tCohort', [dimLabel,'DB('+(f.dbLabel||'전체')+')','7일 내 계약','7일 전환율','30일 내 계약','30일 전환율','전체 계약','전환율'],
+    rows.map(r=>[esc(r.k), fmt(r.db), fmt(r.c7), cell(r.c7,r.db,med7), fmt(r.c30), cell(r.c30,r.db,med30), fmt(r.ca), pc(r.ca,r.db)]),
+    {left:[0], foot:['합계', fmt(tot.db), fmt(tot.c7), pc(tot.c7,tot.db), fmt(tot.c30), pc(tot.c30,tot.db), fmt(tot.ca), pc(tot.ca,tot.db)]});
+  $('#lqNote').textContent = rows.length? `DB 30건 이상 ${rows.length}개 · 중앙값 7일 ${fmt(med7,2)}% / 30일 ${fmt(med30,2)}% · 중앙값 ±20% 밖이면 초록/빨강` : '표시할 항목이 없습니다';
+  // 월별 추이: 관찰 기간이 안 찬 달은 점선 처리
+  const maxD = (DASH.st&&DASH.st.inquiry_max) ? new Date(DASH.st.inquiry_max) : new Date();
+  const T=LQT.filter(r=>dbOf(r)>0).sort((a,b)=>a.period.localeCompare(b.period));
+  const monthEnd=p=>{ const d=new Date(p); return new Date(d.getFullYear(), d.getMonth()+1, 0); };
+  const mature=(p,days)=> (maxD - monthEnd(p))/864e5 >= days;
+  const v=(r,k,days)=> dbOf(r)? +(100*r[k]/dbOf(r)).toFixed(2) : null;
+  const seg = days => ({ borderDash: ctx => mature(T[ctx.p1DataIndex].period, days) ? undefined : [4,4], borderColor: ctx => mature(T[ctx.p1DataIndex].period, days) ? undefined : '#9ca3af' });
+  chart('chCohort',{data:{labels:T.map(r=>r.period.slice(0,7)), datasets:[
+      {type:'line',label:'7일 전환율(%)',data:T.map(r=>v(r,'c7',7)),borderColor:'#2563eb',backgroundColor:'#2563eb',borderWidth:3,tension:.2,segment:seg(7),pointBackgroundColor:T.map(r=>mature(r.period,7)?'#2563eb':'#9ca3af')},
+      {type:'line',label:'30일 전환율(%)',data:T.map(r=>v(r,'c30',30)),borderColor:'#10b981',backgroundColor:'#10b981',borderWidth:3,tension:.2,segment:seg(30),pointBackgroundColor:T.map(r=>mature(r.period,30)?'#10b981':'#9ca3af')}]},
+    options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y}%${mature(T[c.dataIndex].period, c.datasetIndex? 30:7)?'':' (관찰 기간 미충족)'}`}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'%'}}}}});
 }
 function renderLeadInsights({lt, LT, LD, LB, LMB, LPL, grain, f}){
   const out=[]; const add=(cls,title,body)=>out.push({cls,title,body});

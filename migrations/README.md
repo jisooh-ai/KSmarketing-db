@@ -7,6 +7,7 @@ Supabase 는 GitHub 과 자동 연결되어 있지 않으므로, 아래 표의 "
 |---|---|---|---|
 | `2026-10-28_01_리드타임분포_구분별.sql` | `fn_leadtime_dist_by` 신설, `fn_dashboard` 에 LDM 포함 | **미적용** (2026-10-30 13:11 확인 시 함수 없음) | `select proname from pg_proc where proname='fn_leadtime_dist_by';` → 1행 |
 | `2026-10-28_02_광고비API연동.sql` | `ad_spend.source/synced_at`, `fn_spend_upsert_api`, `v_spend_api_keys` | 적용 (2026-10-28 16:50 함수 확인) | `select proname from pg_proc where proname='fn_spend_upsert_api';` → 1행 |
+| `2026-10-30_01_인입코호트_단기전환율.sql` | `fn_leadtime_cohort` 신설(인입 DB 기준 7일·30일 전환율), `fn_dashboard` 에 LQ/LQT 포함 | **미적용** | `select proname from pg_proc where proname='fn_leadtime_cohort';` → 1행 |
 | `applied/2026-10-21_매체브랜드매핑_반영.sql` | media_map 브랜드·유형 일괄 갱신 (데이터 변경) | 적용 (2026-10-21) | 대시보드 브랜드 목록에 2팀 브랜드 표시 |
 
 ## 적용 절차

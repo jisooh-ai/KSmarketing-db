@@ -21,14 +21,14 @@
 - `car_map` — 차량명 raw → `model_std`, `brand`
 - `ad_spend` — (spend_date, brand, channel) PK. 채널 12종 + 수수료 채널 3종(구글 애즈·메타 광고·블로그 인플루언서 ×15%). `source` 수기/api
 - 집계: `agg_inquiry_media`, `agg_inquiry_car`(PostgREST 1,000행 한도·타임아웃 회피). 갱신은 `fn_refresh_agg()`; 유입 업로드 끝에 자동 호출, 설정 탭 [집계 갱신]
-- 조회 함수: `fn_dashboard`(화면 1회 호출로 status,P,M,S,C,L0,LM,LC,LB,LMB,LPL,LD,LDM,LT 반환), `fn_media_period`, `fn_spend_period`, `fn_car_summary`, `fn_leadtime*`, `fn_data_status`, `fn_activity_log`
+- 조회 함수: `fn_dashboard`(화면 1회 호출로 status,P,M,S,C,L0,LM,LC,LB,LMB,LPL,LD,LDM,LT,LQ,LQT 반환), `fn_media_period`, `fn_spend_period`, `fn_car_summary`, `fn_leadtime*`, `fn_data_status`, `fn_activity_log`
 - 권한: RLS 는 `authenticated` 전용. anon 은 읽기도 불가. 관리자(`admin_users`)만 로그 탭. service_role 키는 앱에 절대 넣지 않음(원장 Vercel 환경변수에만)
 
 ## 지표 정의 (바꾸지 말 것 — 임원 보고 기준)
 - 실행매출 = 계약마진 합계 (차량가 아님) · ROAS = 실행매출 ÷ 광고비 × 100 · CPA = 광고비 ÷ DB수(DB당) · 계약당 비용 = 광고비 ÷ 계약수(CPA 라 부르지 않음) · 전환율 = 계약 ÷ DB
 - 중복 제외는 화면 체크박스 2개: CRM(중복여부=Y), IP(7일). 고객명은 중복 기준이 아님
 - 매출 기준일 2종: 계약일자(기본) / 문의일자(코호트). 당월은 계약 진행 중이라 ROAS·전환율이 낮게 보이는 것이 정상(월말 기준 성숙도 약 69%, +30일 ≈ 90%)
-- 리드타임 = 계약일자 − 문의일자, 음수·1년 초과·경비 매체 제외. 대표값은 중앙값. 지인(팀)·추가계약 등은 당일 계약이 많아 전체 중앙값을 끌어내림
+- 리드타임 = 계약일자 − 문의일자(달력일), 음수·1년 초과·경비 매체 제외. 대표값은 중앙값. '7일 이내 비율'은 계약 건 중 비율, '인입 DB 기준 7일/30일 전환율'(fn_leadtime_cohort)은 문의 DB 가 분모 — 둘을 혼용하지 말 것. 지인(팀)·추가계약 등은 당일 계약이 많아 전체 중앙값을 끌어내림
 - 전월 대비는 **완료된 두 달**만 비교(진행 중인 달 제외). 해석 패널 규칙 임계값: 브랜드 비교 광고비 ≥ max(3천만, 중앙값 10%), CPA 변동 ±3% 미만은 안정, 리드타임 비교 표본 ≥ 50건
 
 ## 절대 규칙
