@@ -233,8 +233,11 @@
     <div class="kpis" id="ltKpis"></div>
     <h3 style="margin-top:12px">해석과 제시점 <span class="tip" title="선택한 기간·매출 기준일·브랜드에 맞춰 리드타임 수치를 자동 해석합니다. 규칙 기반 문구이며 최종 판단은 담당자가 합니다">ⓘ</span></h3>
     <div class="insbasis" id="ltInsBasis"></div><div class="ins" id="ltInsights"></div>
-    <div style="margin-top:12px"><h3>기간별 추이 <span class="muted">(중앙값·평균·25%/75% 는 일수, 막대는 계약 건수)</span></h3><canvas id="chLeadTrend" style="max-height:280px"></canvas>
-      <div class="tw" style="margin-top:8px;max-height:260px"><table id="tLeadTrend"></table></div></div>
+    <div class="grid2" style="margin-top:12px">
+      <div><h3>소요일 추이 <span class="tip" title="굵은 선 = 중앙값(대표값). 음영 = 25%~75% 구간(계약의 가운데 절반이 걸린 범위). 점선 = 평균(장기 건에 민감)">ⓘ</span></h3><canvas id="chLeadTrend" style="max-height:280px"></canvas></div>
+      <div><h3>계약 건수 · 7일 이내 비중 <span class="tip" title="막대 = 정상 계약 건수(표본 크기). 선 = 그 기간 계약 중 문의 후 7일 안에 계약된 비율">ⓘ</span></h3><canvas id="chLeadTrend2" style="max-height:280px"></canvas></div>
+    </div>
+    <details class="tbl"><summary>표로 보기</summary><div class="tw" style="margin-top:6px;max-height:260px"><table id="tLeadTrend"></table></div></details>
     <div class="grid2" style="margin-top:12px">
       <div><h3 style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">분포 <span class="tip" title="정상 계약 기준 구간별 건수·비율·누적비율. 구분을 고르면 아래 비교 차트가 바뀌고, 값을 고르면 그 매체(브랜드·플랫폼)만의 분포를 전체 비율과 나란히 보여줍니다">ⓘ</span>
         <select id="ldDim" style="padding:3px 6px;font-size:12px" onchange="ldDimChange()"><option value="media_brand">자사 브랜드</option><option value="media">유입매체</option><option value="platform">플랫폼</option><option value="media_type">매체유형</option></select>
@@ -843,14 +846,27 @@ function renderLead({L0, LM, LC, LB, LD, LMB, LPL, LT}){
     const lt=L0[0]||{}; const grain=document.querySelector('#fLeadGrain input:checked').value;
     const plabel = p => { if(grain==='month') return p.slice(0,7); if(grain==='week'){ const d=new Date(p+'T00:00:00'); const e=new Date(d); e.setDate(d.getDate()+6); const md=x=>`${x.getMonth()+1}/${x.getDate()}`; return `${md(d)}~${md(e)} 주`; } return p; };
     renderTable('tLeadTrend', ['기간','계약 건수','평균(일)','중앙값(일)','25%','75%','7일내'], (LT||[]).map(x=>[plabel(x.period), fmt(x.n), fmt(x.avg_days,1), fmt(x.median_days,1), fmt(x.p25,0), fmt(x.p75,0), fmt(x.within7_pct,1)+'%']));
-    chart('chLeadTrend',{data:{labels:(LT||[]).map(x=>plabel(x.period)), datasets:[
-      {type:'bar',label:'계약 건수',data:(LT||[]).map(x=>x.n),backgroundColor:'rgba(37,99,235,.18)',yAxisID:'y2'},
-      {type:'line',label:'중앙값(일)',data:(LT||[]).map(x=>x.median_days),borderColor:'#2563eb',backgroundColor:'#2563eb',yAxisID:'y',tension:.2},
-      {type:'line',label:'평균(일)',data:(LT||[]).map(x=>x.avg_days),borderColor:'#f59e0b',backgroundColor:'#f59e0b',yAxisID:'y',tension:.2,borderDash:[4,3]},
-      {type:'line',label:'75%(일)',data:(LT||[]).map(x=>x.p75),borderColor:'#8b5cf6',backgroundColor:'#8b5cf6',yAxisID:'y',tension:.2,borderDash:[2,2],pointRadius:2}]},
-      options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true,title:{display:true,text:'일'}},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},title:{display:true,text:'건'}}}}});
-    $('#ltKpis').innerHTML=[['계약 건수(정상)',fmt(lt.n)],['평균',fmt(lt.avg_days,1)+'일'],['중앙값',fmt(lt.median_days,1)+'일'],['25% / 75%',fmt(lt.p25,0)+' / '+fmt(lt.p75,0)+'일'],['7일 이내 비율',fmt(lt.within7_pct,1)+'%']]
-      .map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${lt.n?k[1]:'-'}</div></div>`).join('');
+    const LTv=(LT||[]).filter(x=>x.n>0); const ltLabels=LTv.map(x=>plabel(x.period));
+    chart('chLeadTrend',{data:{labels:ltLabels, datasets:[
+      {type:'line',label:'25%(일)',data:LTv.map(x=>x.p25),borderColor:'rgba(37,99,235,0)',backgroundColor:'rgba(37,99,235,.12)',pointRadius:0,tension:.2,yAxisID:'y',order:3},
+      {type:'line',label:'75%(일)',data:LTv.map(x=>x.p75),borderColor:'rgba(37,99,235,0)',backgroundColor:'rgba(37,99,235,.12)',pointRadius:0,tension:.2,fill:'-1',yAxisID:'y',order:3},
+      {type:'line',label:'중앙값(일)',data:LTv.map(x=>x.median_days),borderColor:'#1d4ed8',backgroundColor:'#1d4ed8',borderWidth:3,tension:.2,yAxisID:'y',order:1},
+      {type:'line',label:'평균(일)',data:LTv.map(x=>x.avg_days),borderColor:'#f59e0b',backgroundColor:'#f59e0b',borderDash:[5,4],pointRadius:2,tension:.2,yAxisID:'y',order:2}]},
+      options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{filter:i=>i.text!=='25%(일)'}},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.parsed.y,1)}일`}}},scales:{y:{beginAtZero:true,title:{display:true,text:'일'}}}}});
+    chart('chLeadTrend2',{data:{labels:ltLabels, datasets:[
+      {type:'bar',label:'계약 건수',data:LTv.map(x=>x.n),backgroundColor:'rgba(37,99,235,.35)',yAxisID:'y',order:2},
+      {type:'line',label:'7일 이내 비중(%)',data:LTv.map(x=>x.within7_pct),borderColor:'#10b981',backgroundColor:'#10b981',borderWidth:3,tension:.2,yAxisID:'y2',order:1}]},
+      options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{tooltip:{callbacks:{label:c=>c.dataset.yAxisID==='y2'? `${c.dataset.label}: ${fmt(c.parsed.y,1)}%` : `${c.dataset.label}: ${fmt(c.parsed.y)}건`}}},scales:{y:{position:'left',beginAtZero:true,title:{display:true,text:'건'}},y2:{position:'right',beginAtZero:true,max:100,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}});
+    // 전월 대비: 월별 그레인에서 '완료된' 두 달 비교 (진행 중인 이번 달과 문의일자 기준의 마지막 달 제외)
+    let mom={}; const f0=DASH.f||{}; if(grain==='month' && (LT||[]).length>=2){
+      const cutoff=new Date(); const curM=cutoff.toISOString().slice(0,7);
+      const done=(LT||[]).filter(x=>x.n>=20 && x.period.slice(0,7)<curM); const seq = f0.basis==='inquiry'? done.slice(0,-1) : done;
+      if(seq.length>=2){ const a=seq[seq.length-2], b=seq[seq.length-1]; mom={a,b,lab:`${a.period.slice(0,7)} → ${b.period.slice(0,7)}`}; } }
+    const dd=(k,hi)=> mom.b? delta(mom.b[k], mom.a[k], hi) : '';
+    const ddp=(k)=> mom.b? (()=>{ const d=mom.b[k]-mom.a[k]; const cls=Math.abs(d)<0.5?'flat':d>0?'up':'down'; return `<div class="d ${cls}">${Math.abs(d)<0.5?'→':d>0?'▲':'▼'} 전월 대비 ${d>=0?'+':''}${fmt(d,1)}%p</div>`; })() : '';
+    $('#ltKpis').innerHTML=[['계약 건수(정상)',fmt(lt.n), dd('n',true)],['평균',fmt(lt.avg_days,1)+'일', dd('avg_days',false)],['중앙값',fmt(lt.median_days,1)+'일', dd('median_days',false)],['25% / 75%',fmt(lt.p25,0)+' / '+fmt(lt.p75,0)+'일', dd('p75',false)],['7일 이내 비율',fmt(lt.within7_pct,1)+'%', ddp('within7_pct')]]
+      .map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${lt.n?k[1]:'-'}</div>${lt.n?k[2]:''}</div>`).join('')
+      + (mom.b? `<div class="kpi" style="background:#f8fafc"><div class="l">전월 대비 기준</div><div class="v" style="font-size:13px;font-weight:600">${mom.lab}</div><div class="muted" style="font-size:11px">완료된 두 달의 ${f0.basis==='inquiry'?'문의':'계약'}월 비교 · 초록 = 개선(소요일은 줄수록)</div></div>` : '');
     renderLeadDist();
     const ltRow = x => [esc(x.dim_value??'(없음)'), fmt(x.n), fmt(x.avg_days,1), fmt(x.median_days,1), fmt(x.p25,0)+' / '+fmt(x.p75,0), fmt(x.within7_pct,1)+'%'];
     const LTH=['구분','건수','평균(일)','중앙값(일)','25%/75%','7일내'];
