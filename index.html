@@ -203,6 +203,16 @@
     <details class="tbl"><summary>표로 보기</summary><div class="tw" style="margin-top:6px"><table id="tTrend"></table></div></details>
   </div>
 
+  <div class="card">
+    <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">브랜드 × 채널 성과 <span class="tip" title="유입링크(utm/[M] 태그)로 문의·계약을 광고채널로 나누고, 같은 브랜드×채널의 광고비(수수료 포함)와 맞춥니다. 링크가 없는 문의는 매체 플랫폼으로 추정(메타·당근·틱톡·플친·대표전화), 사이트 유입인데 링크가 없으면 '사이트(링크 없음)'. 매핑은 매핑 탭 → 유입링크→채널">ⓘ</span>
+      <select id="chBrandSel" style="padding:3px 6px;font-size:12px" onchange="renderChannel()"></select>
+      <span class="muted" id="chNote"></span></h2>
+    <div class="grid2">
+      <div><h3>채널별 ROAS <span class="muted">(막대 = ROAS, 라벨 = 광고비)</span></h3><canvas id="chChanRoas" style="max-height:340px"></canvas></div>
+      <div><h3>채널별 ROAS 월별 추이 <span class="muted">(광고비 있는 채널만)</span></h3><canvas id="chChanTrend" style="max-height:340px"></canvas></div>
+    </div>
+    <div class="tw" style="margin-top:8px"><table id="tChannel"></table></div>
+  </div>
   <div class="card"><h2>브랜드별 요약 <span class="tip" title="매체 마스터의 브랜드 기준. 브랜드가 없는 매체는 매체명 그대로 표시. 광고비·ROAS·CPA는 브랜드 단위로 집계. 하단에 브랜드 평균·중앙값, 이상치는 ▲▼ 배지">ⓘ</span></h2><div class="tw"><table id="tBrand"></table></div>
     <h3>브랜드 × 광고채널 광고비 구성비 <span class="tip" title="브랜드별 광고비를 100%로 놓고 채널 비중을 표시. 막대 끝 숫자는 광고비 합계. 광고비가 큰 브랜드 순">ⓘ</span></h3><canvas id="chSpendCh" style="max-height:360px"></canvas>
     <details class="tbl"><summary>금액 표로 보기</summary><div class="tw" style="margin-top:6px"><table id="tSpendCh"></table></div></details></div>
@@ -359,6 +369,17 @@
       <div class="muted" id="mmMsg"></div>
     </div>
     <div class="tw" style="margin-top:10px;max-height:560px"><table id="tMediaMap"></table></div>
+  </div>
+  <div class="card">
+    <h2>유입링크 → 광고채널 <span class="tip" title="유입 raw의 '유입링크' 값을 태그 기준으로 정규화한 키([M] google → M:google)와 채널의 대응표. 채널 단위 ROAS의 분모·분자가 이 표로 나뉩니다. 새 링크 키는 집계 갱신 때 (미분류)로 자동 추가됩니다">ⓘ</span></h2>
+    <div class="row">
+      <div><label>필터</label><select id="cmFilter"><option value="all">전체</option><option value="unc">미분류만</option></select></div>
+      <div><label>검색</label><input id="cmSearch" placeholder="링크 키"></div>
+      <div><button class="btn sec" onclick="loadChannelMap()">조회</button></div>
+      <div><button class="btn" onclick="saveChannelMap()">변경사항 저장</button></div>
+      <div class="muted" id="cmMsg"></div>
+    </div>
+    <div class="tw" style="margin-top:10px;max-height:480px"><table id="tChannelMap"></table></div>
   </div>
   <div class="card">
     <h2>차량 마스터 <span class="muted">(브랜드/표준모델명 · 건수 많은 순)</span></h2>
@@ -561,7 +582,7 @@ function afterLogin(u){
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('section.page').forEach(s=>s.classList.toggle('on', s.id==='p-'+b.dataset.p));
-  if(b.dataset.p==='map'){ loadMediaMap(); loadCarMap(); }
+  if(b.dataset.p==='map'){ loadMediaMap(); loadCarMap(); loadChannelMap(); }
   if(b.dataset.p==='spend'){ loadBrandList().then(loadSpend); spendSyncStatus(); }
   if(b.dataset.p==='set'){ showStatus(); }
   if(b.dataset.p==='upload'){ loadBatches(); }
@@ -693,14 +714,14 @@ async function loadDash(){
     if((D.status.inquiries>0 || D.status.car_unmapped>0) && (!(D.status.agg_rows>0) || !(D.status.agg_car_rows>0))){ loading(true,'집계 테이블이 비어 있어 갱신 중… (최초 1회, 10~60초)',50); await rpc('fn_refresh_agg',{}); loading(true,'다시 조회 중…',75); D = await rpc('fn_dashboard',args); }
     loading(true,'화면 그리는 중…',90);
     if(D.status.ip_pending>0) ipMigrateLoop(D.status.ip_pending);
-    const {status:st, P, M, S, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM, LQ, LQT} = D;
+    const {status:st, P, M, S, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM, LQ, LQT, CH, CHT} = D;
     const took=((Date.now()-t0)/1000).toFixed(1);
     const inc = r => f.types.includes(r.media_type) && (!f.brands.length || f.brands.includes(brandOf(r)));
     const Pf=P.filter(inc), Mf=M.filter(inc); const Sf=(S||[]).filter(r=>!f.brands.length || f.brands.includes(r.brand));
     const PM=(PMraw||P).filter(inc);   // 월별 시리즈 (전월 대비·해석용)
     const SM=Sf.map(r=>({...r, period:String(r.period).slice(0,7)+'-01'}));
     if(st.brands && JSON.stringify(st.brands)!==JSON.stringify(BRANDS)){ BRANDS=st.brands; const keep=msSel('msBrand'); msFill('msBrand',BRANDS); document.querySelectorAll('#msBrand input').forEach(i=>i.checked=keep.includes(i.value)); msLabel('msBrand'); msFill('msTrend',BRANDS,trendRefilter); msFill('msDl',BRANDS); msFill('msLead',BRANDS,leadReload); if(!document.querySelector('#msSpend input')) msFill('msSpend',BRANDS); }
-    DASH={f, P:Pf, M:Mf, S:Sf, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM:LDM||[], ldDim:'media_brand', LQ:LQ||[], LQT:LQT||[], lqDim:'media_brand', st}; const ldd=$('#ldDim'); if(ldd) ldd.value='media_brand'; const lqd=$('#lqDim'); if(lqd) lqd.value='media_brand';
+    DASH={f, P:Pf, M:Mf, S:Sf, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM:LDM||[], ldDim:'media_brand', LQ:LQ||[], LQT:LQT||[], lqDim:'media_brand', st, CH:CH||[], CHT:CHT||[]}; const ldd=$('#ldDim'); if(ldd) ldd.value='media_brand'; const lqd=$('#lqDim'); if(lqd) lqd.value='media_brand';
     const unc = M.filter(r=>r.media_type==='미분류').length;
     $('#status').innerHTML = `<span class="pill ok">조회 완료 ${took}초</span>` + (f.brands.length?` <span class="pill">브랜드: ${esc(f.brands.join(', '))}</span>`:'') + ` 유입 ${fmt(st.inquiries)}건 (${(st.inquiry_min||'').slice(0,10)} ~ ${(st.inquiry_max||'').slice(0,10)}) · 활성 매출 ${fmt(st.sales_active)}건 (계약일 ${st.contract_min||'-'} ~ ${st.contract_max||'-'}) · 광고비 입력 ${fmt(st.ad_spend_days)}일 (최근 ${st.ad_spend_max||'-'})`
       + (st.sales_unmatched? ` · <span class="pill warn">미매칭 매출 ${fmt(st.sales_unmatched)}건 (유입 매체에 없음, 집계 제외)</span>`:'')
@@ -756,6 +777,11 @@ async function loadDash(){
     renderTable('tBrand', ['브랜드',...METRIC_H], [...br.map(bRow), statRow('브랜드 평균', mean), statRow('브랜드 중앙값', median)], {foot:['합계',...metricCols(s)]});
     // 해석과 제시점
     renderInsights({f, s, mstat, cur, prev, br, brC, mr, mrBig, lt, LD, LB, st});
+    // 브랜드 × 채널
+    { const sel=$('#chBrandSel'); const keep=sel.value; const byCost=new Map(); (CH||[]).forEach(r=>byCost.set(r.brand,(byCost.get(r.brand)||0)+ +r.cost));
+      const bl=[...byCost.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+      sel.innerHTML=bl.map(b=>`<option value="${esc(b)}">${esc(b)}${byCost.get(b)?` (${won(byCost.get(b))})`:''}</option>`).join('');
+      sel.value = bl.includes(keep)? keep : (bl[0]||''); renderChannel(); }
     const chKeys=CHANNELS.filter(c=>Sf.some(r=>r.channel===c)).concat([...new Set(Sf.map(r=>r.channel))].filter(c=>!CHANNELS.includes(c)));
     const chRows=[...bySB.entries()].map(([b,rows])=>{ const m={}; rows.forEach(r=>{ m[r.channel]=(m[r.channel]||0)+ +r.cost; }); const tot=Object.values(m).reduce((a,x)=>a+x,0); return [esc(b), won(tot), ...chKeys.map(c=>m[c]?won(m[c]):'-')]; });
     renderTable('tSpendCh', ['브랜드','광고비 합계',...chKeys], chRows, {foot:['합계', won(s.cost), ...chKeys.map(c=>won(Sf.filter(r=>r.channel===c).reduce((a,r)=>a+ +r.cost,0)))]});
@@ -805,6 +831,29 @@ function insHTML(out, max=4){
   const item=x=>`<div class="it ${x.cls}"><div><span class="tg">${tg[x.cls]}</span><b>${x.title}</b>${x.body?`<details class="more"><summary>근거 · 제안</summary><div>${x.body}</div></details>`:''}</div></div>`;
   const top=o.slice(0,max), rest=o.slice(max);
   return top.map(item).join('') + (rest.length? `<details class="insmore"><summary>그 외 ${rest.length}건 더 보기</summary><div class="ins">${rest.map(item).join('')}</div></details>` : '');
+}
+const CH_COLORS2={'네이버 파워링크':'#03c75a','네이버 GFA':'#1ec800','카카오 키워드 광고':'#f7c600','카카오 모먼트':'#fae100','카카오 친구톡':'#ffd400','구글 애즈':'#4285f4','메타 광고':'#1877f2','틱톡 광고':'#111111','당근 광고':'#ff6f0f','블로그 인플루언서':'#8b5cf6','유튜브 PPL':'#ff0000','기타':'#9ca3af','자연유입':'#6b7280','내부·직접':'#a3a3a3','전화·오프라인':'#78716c','사이트(링크 없음)':'#d4d4d4','(미분류)':'#e5e7eb'};
+function renderChannel(){
+  const f=DASH.f||{}; const brand=$('#chBrandSel').value; const CH=(DASH.CH||[]).filter(r=>r.brand===brand), CHT=(DASH.CHT||[]).filter(r=>r.brand===brand);
+  const dbOf=r=> +(r[f.dbField]??r.db_count??0);
+  const rows=CH.map(r=>({ch:r.channel, db:+r.db_count, dbSel:dbOf(r), c:+r.contracts, rev:+r.revenue, cost:+r.cost, fee:+r.fee})).filter(r=>r.db||r.c||r.cost)
+    .sort((a,b)=>(b.cost-a.cost)||(b.dbSel-a.dbSel));
+  const tot=rows.reduce((a,r)=>({db:a.db+r.db,dbSel:a.dbSel+r.dbSel,c:a.c+r.c,rev:a.rev+r.rev,cost:a.cost+r.cost,fee:a.fee+r.fee}),{db:0,dbSel:0,c:0,rev:0,cost:0,fee:0});
+  const roas=r=> r.cost? 100*r.rev/r.cost : null;
+  const paid=rows.filter(r=>r.cost>0); const medR=median(paid.map(roas)); const oR=outliers(paid.map(roas)); const oC=outliers(paid.filter(r=>r.dbSel).map(r=>r.cost/r.dbSel));
+  const cell=(v,fmtF,o)=> v==null? '-' : fmtF(v)+(o?outl(v,o):'');
+  renderTable('tChannel', ['채널','광고비(수수료 포함)','수수료','DB(전체)','DB('+(f.dbLabel||'전체')+')','계약','실행매출','ROAS','CPA(DB당)','계약당 비용','전환율'],
+    rows.map(r=>[esc(r.ch), r.cost?won(r.cost):'-', r.fee?won(r.fee):'-', fmt(r.db), fmt(r.dbSel), fmt(r.c), won(r.rev), cell(roas(r), v=>fmt(v,1)+'%', paid.includes(r)?oR:null), r.cost&&r.dbSel? cell(r.cost/r.dbSel, v=>won(v), oC):'-', r.cost&&r.c? won(r.cost/r.c):'-', pct(r.c,r.dbSel)]),
+    {left:[0], foot:['합계', won(tot.cost), won(tot.fee), fmt(tot.db), fmt(tot.dbSel), fmt(tot.c), won(tot.rev), tot.cost?fmt(100*tot.rev/tot.cost,1)+'%':'-', tot.cost&&tot.dbSel?won(tot.cost/tot.dbSel):'-', tot.cost&&tot.c?won(tot.cost/tot.c):'-', pct(tot.c,tot.dbSel)]});
+  const unm=rows.filter(r=>r.ch==='(미분류)'||r.ch==='사이트(링크 없음)').reduce((a,r)=>a+r.c,0);
+  $('#chNote').textContent = brand? `광고비 있는 채널 ${paid.length}개 · ROAS 중앙값 ${medR!=null?fmt(medR,0)+'%':'-'}${unm?` · 링크 없는 계약 ${fmt(unm)}건은 채널 미배정`:''}` : '브랜드를 선택하세요';
+  const col=ch=>CH_COLORS2[ch]||hashColor(ch);
+  chart('chChanRoas',{type:'bar',data:{labels:paid.map(r=>r.ch),datasets:[{label:'ROAS(%)',data:paid.map(r=>+roas(r).toFixed(0)),backgroundColor:paid.map(r=>col(r.ch))}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{ const r=paid[c.dataIndex]; return `ROAS ${c.parsed.x}% · 광고비 ${won(r.cost)} · 매출 ${won(r.rev)} · 계약 ${fmt(r.c)}`; }}}},scales:{x:{beginAtZero:true,ticks:{callback:v=>v+'%'}}}}});
+  // 월별 추이: 광고비 상위 6채널
+  const top=paid.slice(0,6).map(r=>r.ch); const periods=[...new Set(CHT.map(r=>r.period))].sort(); const byC=groupBy(CHT, r=>r.channel);
+  chart('chChanTrend',{data:{labels:periods.map(p=>p.slice(0,7)),datasets:top.map(ch=>{ const byP=groupBy(byC.get(ch)||[], r=>r.period); return {type:'line',label:ch,data:periods.map(p=>{ const rs=byP.get(p)||[]; const c=rs.reduce((a,r)=>a+ +r.cost,0), v=rs.reduce((a,r)=>a+ +r.revenue,0); return c? +(100*v/c).toFixed(0) : null; }),borderColor:col(ch),backgroundColor:col(ch),tension:.2,borderWidth:2,pointRadius:2,spanGaps:true}; })},
+    options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'%'}}}}});
 }
 function renderInsights(ctx){
   const {f,s,mstat,cur,prev,br,brC,mr,mrBig,lt,LD,LB,st}=ctx; const out=[];
@@ -1268,6 +1317,24 @@ async function saveMediaMap(){
     return {media_raw:k, media_std:std, media_type:g('media_type'), platform:(g('platform')||'').trim()||null, brand:(g('brand')||'').trim()||null, memo:(g('memo')||'').trim()||null, updated_at:new Date().toISOString()}; });
   const {error}=await sb.from('media_map').upsert(ups,{onConflict:'media_raw'}); if(error) return toast(sqlErr(error));
   mmDirtyKeys.clear(); toast(`${ups.length}건 저장`); loadMediaMap(); loadBrandList();
+}
+const CH_OPTIONS=['네이버 파워링크','네이버 GFA','카카오 키워드 광고','카카오 모먼트','카카오 친구톡','구글 애즈','메타 광고','틱톡 광고','당근 광고','블로그 인플루언서','유튜브 PPL','기타','자연유입','내부·직접','전화·오프라인','(미분류)'];
+let CMROWS=[]; const lkDirtyKeys=new Set(); function lkDirty(el){ lkDirtyKeys.add(el.dataset.k); el.style.background='#fff7e6'; }
+async function loadChannelMap(){
+  try{ CMROWS=await selectAll('v_channel_counts'); const f=$('#cmFilter').value, q=$('#cmSearch').value.trim();
+    const rows=CMROWS.filter(r=>(f==='all'||r.channel==='(미분류)') && (!q||r.link_key.includes(q))).sort((a,b)=>b.inquiry_count-a.inquiry_count);
+    const unc=CMROWS.filter(r=>r.channel==='(미분류)').reduce((a,r)=>a+ +r.inquiry_count,0);
+    $('#cmMsg').textContent=`${rows.length}개 표시 / 전체 ${CMROWS.length}개 · 미분류 유입 ${fmt(unc)}건`;
+    renderTable('tChannelMap', ['링크 키','유입DB','매출건','채널','예시 매체','메모','출처'], rows.map(r=>[esc(r.link_key), fmt(r.inquiry_count), fmt(r.sales_count),
+      `<select data-k="${esc(r.link_key)}" data-f="channel" onchange="lkDirty(this)">${CH_OPTIONS.map(c=>`<option ${c===r.channel?'selected':''}>${c}</option>`).join('')}</select>`,
+      esc((r.sample||[]).join(', ')), `<input data-k="${esc(r.link_key)}" data-f="note" value="${esc(r.note||'')}" style="width:160px" onchange="lkDirty(this)">`, esc(r.mapped_by||'')]), {left:[0,3,4,5,6]});
+  }catch(e){ toast('채널 매핑 조회 실패: '+sqlErr(e)); }
+}
+async function saveChannelMap(){
+  if(!lkDirtyKeys.size) return toast('변경된 행이 없습니다');
+  const ups=[...lkDirtyKeys].map(k=>{ const g=f=>document.querySelector(`#tChannelMap [data-k="${CSS.escape(k)}"][data-f="${f}"]`)?.value; return {link_key:k, channel:g('channel'), note:(g('note')||'').trim()||null, mapped_by:user.email, updated_at:new Date().toISOString()}; });
+  const {error}=await sb.from('channel_map').upsert(ups,{onConflict:'link_key'}); if(error) return toast(sqlErr(error));
+  lkDirtyKeys.clear(); toast(`${ups.length}건 저장 — 대시보드 [조회]를 다시 누르면 반영`); loadChannelMap();
 }
 async function loadCarMap(){
   try{
