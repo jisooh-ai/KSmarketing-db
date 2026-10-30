@@ -190,11 +190,16 @@
         <label><input type="radio" name="grain" value="day">일별</label>
         <label><input type="radio" name="grain" value="year">연별</label></div>
       <div class="ms" id="msTrend" style="margin-left:12px"><button class="btn sec sm" type="button" onclick="this.parentNode.classList.toggle('open')">추이 브랜드: 전체 ▾</button><div class="pop"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msTrend',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msTrend',false)">전체 해제</button></div><div class="list"></div></div></div>
+      <div class="ms" id="msTrendMedia" style="margin-left:6px"><button class="btn sec sm" type="button" onclick="this.parentNode.classList.toggle('open')">추이 매체: 전체 ▾</button><div class="pop" style="min-width:300px"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msTrendMedia',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msTrendMedia',false)">전체 해제</button><span class="muted" style="margin-left:auto">선택 브랜드의 매체만 표시</span></div><div class="list"></div></div></div>
+      <span class="tip" title="브랜드를 고르면 그 브랜드의 광고매체만 목록에 남습니다. 매체를 고르면 DB·계약·실행매출은 그 매체 기준으로, 광고비·ROAS는 매체 단위로 입력되지 않아 표시되지 않습니다">ⓘ</span>
       <span class="muted" id="trendMsg"></span></div>
     <div class="grid2">
-      <div><h3>광고비 · 실행매출 · ROAS</h3><canvas id="chTrend" style="max-height:300px"></canvas></div>
+      <div><h3 id="chTrendTitle">광고비 · 실행매출 · ROAS</h3><canvas id="chTrend" style="max-height:300px"></canvas></div>
       <div><h3>DB · 계약 · 전환율</h3><canvas id="chTrend2" style="max-height:300px"></canvas></div>
     </div>
+    <div style="margin-top:12px"><h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">매체별 추이 비교 <span class="tip" title="선택한 매체(없으면 선택 브랜드 안에서 DB 많은 순 6개)를 기간별로 겹쳐 비교. 지표를 바꿔 볼 수 있습니다">ⓘ</span>
+      <select id="tmMetric" style="padding:3px 6px;font-size:12px" onchange="trendRefilter()"><option value="dbSel">DB수</option><option value="contracts">계약수</option><option value="cv">전환율(%)</option><option value="revenue">실행매출</option></select>
+      <span class="muted" id="tmNote"></span></h3><canvas id="chTrendMedia" style="max-height:320px"></canvas></div>
     <details class="tbl"><summary>표로 보기</summary><div class="tw" style="margin-top:6px"><table id="tTrend"></table></div></details>
   </div>
 
@@ -311,6 +316,17 @@
       <div><button class="btn" onclick="uploadSpend()">업로드</button></div>
     </div>
     <div id="spMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+  <div class="card">
+    <h2>매체 API 자동 수집 (인입 DB 원장 연동) <span class="tip" title="인입 DB 원장(Vercel)이 매일 아침 메타·구글·네이버·카카오·틱톡 광고비를 API로 받아 이 DB의 ad_spend에 넣습니다. 같은 일자+브랜드+채널은 나중에 들어온 값(자동이든 수기든)이 우선합니다">ⓘ</span></h2>
+    <div id="spSyncStat" class="muted">상태 확인 중…</div>
+    <div class="row" style="margin-top:8px">
+      <div><label>가져올 기간 (최대 93일)</label><div class="row"><input type="date" id="spSyncFrom"><input type="date" id="spSyncTo"></div></div>
+      <div><label>원장 주소</label><input id="spSyncUrl" style="min-width:260px" placeholder="https://ks-inflow-db.vercel.app"></div>
+      <div><label>동기화 토큰 <span class="tip" title="원장 Vercel 환경변수 SPEND_SYNC_TOKEN 과 같은 값. 이 브라우저에만 저장됩니다">ⓘ</span></label><input id="spSyncToken" type="password" style="min-width:200px"></div>
+      <div><button class="btn" onclick="spendSyncNow()">지금 가져오기</button></div>
+    </div>
+    <div id="spSyncMsg" class="muted" style="margin-top:6px">매일 자동으로도 들어오므로 보통은 누를 필요가 없습니다. 과거 기간을 채우거나 방금 원장에서 수집한 값을 바로 반영할 때만 사용하세요.</div>
   </div>
   <div class="card">
     <h2>월별 광고비 내역</h2>
@@ -534,7 +550,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('section.page').forEach(s=>s.classList.toggle('on', s.id==='p-'+b.dataset.p));
   if(b.dataset.p==='map'){ loadMediaMap(); loadCarMap(); }
-  if(b.dataset.p==='spend'){ loadBrandList().then(loadSpend); }
+  if(b.dataset.p==='spend'){ loadBrandList().then(loadSpend); spendSyncStatus(); }
   if(b.dataset.p==='set'){ showStatus(); }
   if(b.dataset.p==='upload'){ loadBatches(); }
   if(b.dataset.p==='log'){ loadLog(); loadAdmins(); }
@@ -547,8 +563,8 @@ $('#upKind').onchange=()=>{ $('#piiBox').style.display = $('#upKind').value==='i
 let BRANDS=[];
 function msFill(id, brands, onchange){ const el=$('#'+id); el.querySelector('.list').innerHTML=[...brands].map(b=>`<label><input type="checkbox" value="${esc(b)}">${esc(b)}</label>`).join(''); el.querySelectorAll('input').forEach(i=>i.onchange=()=>{ msLabel(id); el._dirty=true; onchange&&onchange(); }); msLabel(id); }
 function msSel(id){ return [...document.querySelectorAll('#'+id+' input:checked')].map(i=>i.value); }
-function msAll(id,on){ document.querySelectorAll('#'+id+' input').forEach(i=>i.checked=on); msLabel(id); const el=$('#'+id); el._dirty=true; if(id==='msTrend') trendRefilter(); if(id==='msLead') leadReload(); }
-function msLabel(id){ const sel=msSel(id); const n=document.querySelectorAll('#'+id+' input').length; const b=document.querySelector('#'+id+'>button'); const pre = id==='msTrend'?'추이 브랜드: ':''; b.textContent = pre + (sel.length===0||sel.length===n ? '전체 브랜드' : sel.length===1 ? sel[0] : `${sel.length}개 브랜드`) + ' ▾'; }
+function msAll(id,on){ document.querySelectorAll('#'+id+' input').forEach(i=>i.checked=on); msLabel(id); const el=$('#'+id); el._dirty=true; if(id==='msTrend'||id==='msTrendMedia') trendRefilter(); if(id==='msLead') leadReload(); }
+function msLabel(id){ const sel=msSel(id); const n=document.querySelectorAll('#'+id+' input').length; const b=document.querySelector('#'+id+'>button'); const pre = id==='msTrend'?'추이 브랜드: ': id==='msTrendMedia'?'추이 매체: ':''; const unit = id==='msTrendMedia'?'매체':'브랜드'; b.textContent = pre + (sel.length===0||sel.length===n ? '전체 '+unit : sel.length===1 ? sel[0] : `${sel.length}개 ${unit}`) + ' ▾'; }
 document.addEventListener('click', e=>{ document.querySelectorAll('.ms.open').forEach(m=>{ if(!m.contains(e.target)){ m.classList.remove('open'); if(m.id==='msBrand' && m._dirty){ m._dirty=false; loadDash(); } } }); });
 function brandOf(r){ return r.brand || r.media_std || '(브랜드 없음)'; }   // 브랜드 미지정 매체는 매체명 그대로 표시
 function filters(){
@@ -599,9 +615,31 @@ function renderTable(id, headers, rows, opts={}){
   });
 }
 function trendSel(){ const sel=msSel('msTrend'); const n=document.querySelectorAll('#msTrend input').length; return (!sel.length||sel.length===n)? null : sel; }
-function trendFilter(Pf){ const sel=trendSel(); return sel? Pf.filter(r=>sel.includes(brandOf(r))) : Pf; }
-function trendSpend(){ const sel=trendSel(); const S=DASH.S||[]; return sel? S.filter(r=>sel.includes(r.brand)) : S; }
-function trendRefilter(){ if(!DASH.Pall) return; const Pt=trendFilter(DASH.Pall); renderTrend(Pt, DASH.f, sumRows(Pt, DASH.f, trendSpend())); }
+function trendMediaSel(){ const sel=msSel('msTrendMedia'); const n=document.querySelectorAll('#msTrendMedia input').length; return (!sel.length||sel.length===n)? null : sel; }
+function trendFilter(Pf){ const sel=trendSel(), ms=trendMediaSel(); let out = sel? Pf.filter(r=>sel.includes(brandOf(r))) : Pf; if(ms) out=out.filter(r=>ms.includes(r.media_std)); return out; }
+function trendSpend(){ if(trendMediaSel()) return []; const sel=trendSel(); const S=DASH.S||[]; return sel? S.filter(r=>sel.includes(r.brand)) : S; }   // 매체 선택 시 광고비는 매체 단위가 없어 제외
+// 브랜드 선택에 맞춰 매체 목록 채우기 (선택 유지)
+function trendMediaFill(){ if(!DASH.Pall) return; const sel=trendSel(); const rows = sel? DASH.Pall.filter(r=>sel.includes(brandOf(r))) : DASH.Pall; const f=DASH.f||{};
+  const by=new Map(); rows.forEach(r=>{ const k=r.media_std||'(없음)'; by.set(k,(by.get(k)||0)+ +(r[f.dbField]??r.db_count??0)); });
+  const list=[...by.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]); const keep=msSel('msTrendMedia');
+  const el=$('#msTrendMedia'); el.querySelector('.list').innerHTML=list.map(m=>`<label><input type="checkbox" value="${esc(m)}" ${keep.includes(m)?'checked':''}>${esc(m)} <span class="muted">(${fmt(by.get(m))})</span></label>`).join('');
+  el.querySelectorAll('input').forEach(i=>i.onchange=()=>{ msLabel('msTrendMedia'); trendRefilter(); }); msLabel('msTrendMedia'); }
+function trendRefilter(){ if(!DASH.Pall) return; trendMediaFill(); const Pt=trendFilter(DASH.Pall); renderTrend(Pt, DASH.f, sumRows(Pt, DASH.f, trendSpend())); renderTrendMedia(); }
+// 매체별 추이 비교 (선택 매체 또는 선택 브랜드 내 DB 상위 6개)
+function renderTrendMedia(){
+  const f=DASH.f; const metric=$('#tmMetric').value; const sel=trendSel(); const ms=trendMediaSel();
+  let rows = sel? DASH.Pall.filter(r=>sel.includes(brandOf(r))) : DASH.Pall;
+  const byM=groupBy(rows, r=>r.media_std||'(없음)');
+  let medias = ms? ms.filter(m=>byM.has(m)) : [...byM.entries()].map(([k,v])=>[k, v.reduce((a,r)=>a+ +(r[f.dbField]??r.db_count??0),0)]).sort((a,b)=>b[1]-a[1]).slice(0,6).map(x=>x[0]);
+  const periods=[...new Set(rows.map(r=>r.period))].sort();
+  const plabel = p => f.grain==='month'? p.slice(0,7) : f.grain==='year'? p.slice(0,4) : p;
+  const val = (rs)=>{ const x=sumRows(rs,f,[]); return metric==='cv'? (x.dbSel? +(100*x.contracts/x.dbSel).toFixed(2):null) : metric==='revenue'? x.revenue : x[metric]; };
+  const PAL=['#2563eb','#f59e0b','#10b981','#8b5cf6','#ef4444','#0ea5e9','#d946ef','#84cc16','#f97316','#6b7280','#14b8a6','#a855f7'];
+  const ds=medias.map((m,i)=>{ const byP=groupBy(byM.get(m)||[], r=>r.period); return {type:'line',label:m.length>22?m.slice(0,21)+'…':m,data:periods.map(p=>byP.has(p)? val(byP.get(p)) : null),borderColor:PAL[i%PAL.length],backgroundColor:PAL[i%PAL.length],tension:.2,borderWidth:2,pointRadius:2,spanGaps:true}; });
+  const lab={dbSel:'DB('+f.dbLabel+')',contracts:'계약수',cv:'전환율(%)',revenue:'실행매출'}[metric];
+  $('#tmNote').textContent = medias.length? `${ms?'선택 매체':'DB 상위'} ${medias.length}개 · ${lab}` : '표시할 매체가 없습니다';
+  chart('chTrendMedia',{data:{labels:periods.map(plabel),datasets:ds},options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom'},tooltip:{callbacks:{title:items=>items[0]?.label, label:c=>`${medias[c.datasetIndex]}: ${metric==='cv'? c.parsed.y+'%' : metric==='revenue'? won(c.parsed.y) : fmt(c.parsed.y)}`}}},scales:{y:{beginAtZero:true,ticks:{callback:v=> metric==='cv'? v+'%' : metric==='revenue'? won(v) : fmt(v)}}}}});
+}
 function renderTrend(Pf, f, s){
     const Sp=trendSpend(); const bySP=groupBy(Sp, r=>r.period);
   const byP=groupBy(Pf, r=>r.period); const periods=[...new Set([...byP.keys(), ...bySP.keys()])].sort();
@@ -609,11 +647,13 @@ function renderTrend(Pf, f, s){
     if(f.grain==='week'){ const d=new Date(p+'T00:00:00'); const e=new Date(d); e.setDate(d.getDate()+6); const md=x=>`${x.getMonth()+1}/${x.getDate()}`; return `${md(d)}~${md(e)} 주`; } return p; };
   const tr = periods.map(p=>{ const x=sumRows(byP.get(p)||[],f,bySP.get(p)||[]); return {p, label:plabel(p), ...x}; }).filter(x=>x.db>0 || x.contracts>0);   // 유입이 없는 말단 기간(데이터 미도달)은 제외
   renderTable('tTrend', ['기간',...METRIC_H], tr.map(x=>[x.label, ...metricCols(x)]), {foot:['합계',...metricCols(s)]});
+  $('#chTrendTitle').textContent = trendMediaSel()? '실행매출 (매체 선택 시 광고비·ROAS 제외)' : '광고비 · 실행매출 · ROAS';
+  const noCost=!!trendMediaSel();
   chart('chTrend',{data:{labels:tr.map(x=>x.label), datasets:[
-    {type:'bar',label:'광고비',data:tr.map(x=>x.cost),backgroundColor:'rgba(245,158,11,.75)',yAxisID:'y'},
+    ...(noCost?[]:[{type:'bar',label:'광고비',data:tr.map(x=>x.cost),backgroundColor:'rgba(245,158,11,.75)',yAxisID:'y'}]),
     {type:'bar',label:'실행매출',data:tr.map(x=>x.revenue),backgroundColor:'rgba(37,99,235,.75)',yAxisID:'y'},
-    {type:'line',label:'ROAS(%)',data:tr.map(x=>x.cost? +(100*x.revenue/x.cost).toFixed(1) : null),borderColor:'#dc2626',backgroundColor:'#dc2626',yAxisID:'y2',tension:.2,borderWidth:3}]},
-    options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true,ticks:{callback:v=>won(v)}},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}});
+    ...(noCost?[]:[{type:'line',label:'ROAS(%)',data:tr.map(x=>x.cost? +(100*x.revenue/x.cost).toFixed(1) : null),borderColor:'#dc2626',backgroundColor:'#dc2626',yAxisID:'y2',tension:.2,borderWidth:3}])]},
+    options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true,ticks:{callback:v=>won(v)}},y2:{display:!noCost,position:'right',beginAtZero:true,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}});
   chart('chTrend2',{data:{labels:tr.map(x=>x.label), datasets:[
     {type:'bar',label:'DB('+f.dbLabel+')',data:tr.map(x=>x.dbSel),backgroundColor:'rgba(37,99,235,.45)',yAxisID:'y'},
     {type:'bar',label:'계약수',data:tr.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.85)',yAxisID:'y2'},
@@ -1030,8 +1070,26 @@ async function loadBrandList(){ // 매체 마스터의 브랜드 목록
 async function saveSpend(){
   const row={spend_date:$('#spDate').value, brand:$('#spBrand').value, channel:$('#spChannel').value, cost:+$('#spCost').value||0, impressions:$('#spImp').value?+$('#spImp').value:null, clicks:$('#spClk').value?+$('#spClk').value:null, memo:$('#spMemo').value||null, updated_at:new Date().toISOString()};
   if(!row.spend_date||!row.brand||!row.channel) return toast('일자·브랜드·채널을 입력하세요');
-  const {error}=await sb.from('ad_spend').upsert(row,{onConflict:'spend_date,brand,channel'}); if(error) return toast(sqlErr(error));
+  row.source='수기'; const {error}=await sb.from('ad_spend').upsert(row,{onConflict:'spend_date,brand,channel'}); if(error) return toast(sqlErr(error));
   toast('저장됨'); $('#spCost').value=''; $('#spImp').value=''; $('#spClk').value=''; loadSpend();
+}
+async function spendSyncStatus(){
+  try{ const {data}=await sb.from('ad_spend').select('synced_at,spend_date').eq('source','api').order('synced_at',{ascending:false}).limit(1);
+    const {count}=await sb.from('ad_spend').select('*',{count:'exact',head:true}).eq('source','api');
+    $('#spSyncStat').innerHTML = (data&&data[0])? `마지막 자동 수집: <b>${data[0].synced_at.slice(0,16).replace('T',' ')}</b> · API 행 ${fmt(count||0)}건 (광고비 내역에 <span class="pill ok">API</span> 배지)` : '아직 자동 수집된 광고비가 없습니다. 원장 패치가 적용되면 매일 아침 들어옵니다.';
+  }catch(e){ $('#spSyncStat').textContent='상태 조회 실패: '+sqlErr(e); }
+  try{ $('#spSyncUrl').value = localStorage.getItem('spSyncUrl')||'https://ks-inflow-db.vercel.app'; $('#spSyncToken').value = localStorage.getItem('spSyncToken')||''; }catch{}
+  if(!$('#spSyncTo').value){ const t=new Date(); const a=new Date(t); a.setDate(t.getDate()-1); const b=new Date(t); b.setDate(t.getDate()-7); $('#spSyncTo').value=a.toISOString().slice(0,10); $('#spSyncFrom').value=b.toISOString().slice(0,10); }
+}
+async function spendSyncNow(){
+  const url=($('#spSyncUrl').value||'').trim().replace(/\/$/,''), token=($('#spSyncToken').value||'').trim(), since=$('#spSyncFrom').value, until=$('#spSyncTo').value;
+  if(!url||!token) return toast('원장 주소와 동기화 토큰을 입력하세요'); if(!since||!until||since>until) return toast('기간을 확인하세요');
+  try{ localStorage.setItem('spSyncUrl',url); localStorage.setItem('spSyncToken',token); }catch{}
+  $('#spSyncMsg').textContent='원장에 요청 중… (매체 API 호출 없이 원장에 저장된 광고비만 보냅니다)';
+  try{ const r=await fetch(url+'/api/spend-sync',{method:'POST',headers:{'content-type':'application/json','x-sync-token':token},body:JSON.stringify({since,until})}); const j=await r.json().catch(()=>({}));
+    if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status));
+    $('#spSyncMsg').innerHTML=`<span class="pill ok">완료</span> ${since}~${until} · ${fmt(j.rows||0)}행 전송 (일자×브랜드×채널, 수수료 포함) · 저장 ${fmt(j.sent||0)}행`; spendSyncStatus(); loadSpend();
+  }catch(e){ $('#spSyncMsg').innerHTML=`<span class="pill bad">실패</span> ${esc(e.message)} — 원장 배포·토큰·CORS 설정을 확인하세요`; }
 }
 async function loadSpend(){
   const m=$('#spMonth').value; if(!m) return; const from=m+'-01'; const to=new Date(+m.slice(0,4), +m.slice(5,7), 0).toISOString().slice(0,10);
@@ -1106,12 +1164,11 @@ async function uploadSpend(){
         mp.set(d+'|'+b+'|'+c, {spend_date:d, brand:b, channel:c, cost:n, memo, updated_at:new Date().toISOString()}); } }
     if(!mp.size) throw new Error('입력된 금액이 없습니다 (채널 칸이 모두 비어 있음)');
     if(unknown.size && !confirm(`매체 마스터에 없는 브랜드 ${unknown.size}종: ${[...unknown].slice(0,10).join(', ')}\n그대로 저장할까요? (브랜드별 ROAS 에 연결되지 않습니다)`)) { loading(false); return; }
-    let arr=[...mp.values()]; loading(true,`저장 중… ${fmt(arr.length)}건`,70);
-    { // 매체 API 로 자동 수집된 행은 수기 값으로 덮어쓰지 않음
+    let arr=[...mp.values()].map(x=>({...x, source:'수기'})); loading(true,`저장 중… ${fmt(arr.length)}건`,70);
+    { // 같은 일자+브랜드+채널은 최신 업로드가 우선(덮어씀). API 수집 행을 덮어쓰면 건수만 안내
       const ds=[...new Set(arr.map(x=>x.spend_date))].sort(); const {data:apiKeys}=await sb.from('v_spend_api_keys').select('*').gte('spend_date',ds[0]).lte('spend_date',ds[ds.length-1]);
-      const ak=new Set((apiKeys||[]).map(k=>k.spend_date+'|'+k.brand+'|'+k.channel)); const before=arr.length; arr=arr.filter(x=>!ak.has(x.spend_date+'|'+x.brand+'|'+x.channel));
-      if(before!==arr.length) toast(`API 자동 수집 행 ${fmt(before-arr.length)}건은 건너뜀 (수기 값으로 덮어쓰지 않음)`);
-      if(!arr.length){ $('#spMsg').innerHTML='<span class="pill warn">저장할 행 없음</span> 모두 API 수집 행입니다.'; loading(false); return; } }
+      const ak=new Set((apiKeys||[]).map(k=>k.spend_date+'|'+k.brand+'|'+k.channel)); const over=arr.filter(x=>ak.has(x.spend_date+'|'+x.brand+'|'+x.channel)).length;
+      if(over) toast(`API 자동 수집 행 ${fmt(over)}건을 이번 업로드 값으로 덮어씁니다`); }
     for(let i=0;i<arr.length;i+=500){ const {error}=await sb.from('ad_spend').upsert(arr.slice(i,i+500),{onConflict:'spend_date,brand,channel'}); if(error) throw error; }
     await sb.from('upload_batches').insert({kind:'ad_spend', filename:file.name, row_count:arr.length, uploaded_by:user.email});
     $('#spMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(arr.length)}건 저장 (브랜드 ${new Set(arr.map(x=>x.brand)).size}개 · ${new Set(arr.map(x=>x.spend_date)).size}일)` + (badDate.length?` · 일자 해석 불가 ${badDate.length}행 건너뜀 (행 ${badDate.slice(0,10).join(', ')})`:'');

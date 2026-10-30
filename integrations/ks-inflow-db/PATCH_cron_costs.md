@@ -40,6 +40,8 @@ const spendSync = require('../lib/spend_sync');
 - `api/spend-sync.js` (과거 기간 수동 보내기: 로그인 상태에서 POST {since, until})
 
 ## Vercel 환경 변수
+- `SPEND_SYNC_TOKEN` = 임의의 긴 비밀 문자열 (퍼포먼스 DB 화면 [지금 가져오기] 버튼용 — 같은 값을 그 화면 토큰 칸에 입력)
+- `SPEND_SYNC_ORIGIN` = https://jisooh-ai.github.io (기본값이므로 생략 가능)
 - `SUPABASE_URL` = https://qhlygfqetcfnoialihyc.supabase.co  (os_sync 와 같은 변수라면 이미 있음)
 - `SUPABASE_SERVICE_ROLE_KEY` = Supabase → Settings → API → service_role (secret)
 - (선택) `SPEND_SYNC=off` → 잠시 끄기

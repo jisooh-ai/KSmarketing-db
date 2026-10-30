@@ -1,10 +1,31 @@
-// 퍼포먼스 DB 로 광고비 수동 동기화(과거 기간 채우기) — POST { since:'YYYY-MM-DD', until:'YYYY-MM-DD' } (최대 93일)
-// 오류는 원인 메시지를 그대로 돌려줍니다 (로그인한 사용자만 호출 가능)
+// 퍼포먼스 DB 로 광고비 동기화 — POST { since:'YYYY-MM-DD', until:'YYYY-MM-DD' } (최대 93일)
+// 인증 두 가지 중 하나:
+//   1) 원장 로그인 세션 (이 사이트 콘솔·화면에서 호출)
+//   2) 헤더 x-sync-token == 환경 변수 SPEND_SYNC_TOKEN (퍼포먼스 DB 화면의 [지금 가져오기] 버튼이 사용)
+// CORS: 환경 변수 SPEND_SYNC_ORIGIN (기본 https://jisooh-ai.github.io) 에서 오는 요청만 허용
+// 오류는 원인 메시지를 그대로 돌려줍니다.
 const wrap = require('./_util');
 const A = require('../lib/auth');
 
+const ORIGIN = String(process.env.SPEND_SYNC_ORIGIN || 'https://jisooh-ai.github.io').trim();
+function cors(req, res) {
+  const o = String(req.headers.origin || '');
+  if (o && o === ORIGIN) {
+    res.setHeader('Access-Control-Allow-Origin', o);
+    res.setHeader('Access-Control-Allow-Headers', 'content-type, x-sync-token');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Max-Age', '600');
+  }
+}
+function tokenOk(req) {
+  const t = String(process.env.SPEND_SYNC_TOKEN || '').trim();
+  return !!t && String(req.headers['x-sync-token'] || '') === t;
+}
+
 module.exports = wrap(async (req, res) => {
-  const s = A.requireSession(req, res); if (!s) return;
+  cors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (!tokenOk(req)) { const s = A.requireSession(req, res); if (!s) return; }
   let sync;
   try { sync = require('../lib/spend_sync'); }
   catch (e) { return res.status(500).json({ error: 'lib/spend_sync.js 를 불러오지 못했습니다: ' + e.message }); }
@@ -20,6 +41,6 @@ module.exports = wrap(async (req, res) => {
     res.json({ ok: true, ...r });
   } catch (e) {
     console.error('[spend-sync]', e);
-    res.status(500).json({ error: e.message || String(e), step: e.step || '' });
+    res.status(500).json({ error: e.message || String(e) });
   }
-});
+}, { skipIp: true });   // 토큰 또는 로그인 세션으로 보호 (퍼포먼스 DB 화면은 사무실 밖에서도 쓰므로 IP 제한 제외)
