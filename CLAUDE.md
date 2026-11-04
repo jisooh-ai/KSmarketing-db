@@ -9,7 +9,7 @@
 |---|---|
 | `index.html` | 앱 전체(HTML+CSS+JS 한 파일). 상단 `<script>`에 SUPABASE_URL / ANON_KEY 가 박혀 있음(anon 키는 공개 가능, RLS 로 보호). 외부 라이브러리: supabase-js 2.45.4, SheetJS 0.18.5, Chart.js 4.4.1, ExcelJS 4.4.0(지연 로드) |
 | `supabase_setup.sql` | 스키마·함수·RLS 전체본. **멱등** — 처음부터 끝까지 재실행 가능해야 함 |
-| `supabase_seed.sql` | media_map 119 + car_map 10,451 초기 매핑 |
+| `supabase_seed.sql` | media_map 119 + car_map 9,754 초기 매핑 (전화번호만 입력된 차량명 697건 제외, 문장 속 번호는 가운데 마스킹) |
 | `migrations/` | setup 에 반영된 변경분을 따로 뽑은 파일 + 적용 현황표(README). **새 SQL 변경은 setup 에도 넣고 migrations 에도 파일을 추가** |
 | `docs/` | 적용가이드, 매뉴얼 PDF 3종, 진단용 SQL |
 | `integrations/ks-inflow-db/` | 별도 저장소(인입 DB 원장, Vercel)에 넣는 광고비 API 동기화 패치. 이 저장소에서는 실행되지 않음 |
