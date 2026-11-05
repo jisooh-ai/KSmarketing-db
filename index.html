@@ -724,7 +724,7 @@ async function loadDash(){
     const args={p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:f.basis,p_brands:f.brands.length?f.brands:null};
     let D = await rpc('fn_dashboard',args);
     const PMraw = f.grain==='month' ? null : await rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:'month',p_basis:f.basis});
-    if((D.status.inquiries>0 || D.status.car_unmapped>0) && (!(D.status.agg_rows>0) || !(D.status.agg_car_rows>0))){ loading(true,'집계 테이블이 비어 있어 갱신 중… (최초 1회, 10~60초)',50); await rpc('fn_refresh_agg',{}); loading(true,'다시 조회 중…',75); D = await rpc('fn_dashboard',args); }
+    if((D.status.inquiries>0 || D.status.car_unmapped>0) && (!(D.status.agg_rows>0) || !(D.status.agg_car_rows>0))){ loading(true,'집계 테이블이 비어 있어 갱신 중… (최초 1회)',50); await refreshAggAll('최초 집계'); loading(true,'다시 조회 중…',75); D = await rpc('fn_dashboard',args); }
     loading(true,'화면 그리는 중…',90);
     if(D.status.ip_pending>0) ipMigrateLoop(D.status.ip_pending);
     const {status:st, P, M, S, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM, LQ, LQT, CH, CHT} = D;
@@ -835,7 +835,7 @@ async function ipMigrateLoop(pending){
       $('#status').innerHTML += ` <span class="pill warn" id="ipPill">IP 중복 판정 준비 중… 남은 ${fmt(pending)}행 (자동 처리, 화면은 계속 사용 가능)</span>`;
       const r=await rpc('fn_ip_migrate',{p_n:10000}); pending=r.ip_pending||0; }
     const el=$('#ipPill'); if(el) el.textContent='IP 이관 완료 · 집계 갱신 중…';
-    await rpc('fn_refresh_agg',{});
+    await refreshAggAll('IP 중복 반영');
     toast('IP 중복 판정 완료 — 반영된 결과로 다시 조회합니다', 5000); loadDash();
   }catch(e){ toast('IP 이관 중단: '+sqlErr(e)+' (다시 조회하면 이어서 진행)', 6000); }
   finally{ _ipLoop=false; }
@@ -1160,7 +1160,7 @@ async function doUpload(){
     }
     await sb.from('upload_batches').update({row_count:done}).eq('id',b.id);
     $('#upMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(done)}행 저장 (배치 #${b.id}) · 집계 갱신 중…`;
-    if(kind==='inquiry'){ loading(true,'집계·IP 중복 갱신 중…',97); try{ let m={ip_pending:1}; while((m.ip_pending||0)>0){ m=await rpc('fn_ip_migrate',{p_n:10000}); } await rpc('fn_refresh_agg',{}); }catch(e){ toast('집계 갱신 실패: '+sqlErr(e)+' — 설정 탭에서 [집계 갱신]을 다시 눌러주세요', 6000); } }
+    if(kind==='inquiry'){ loading(true,'IP 중복 갱신 중…',90); try{ let m={ip_pending:1}; while((m.ip_pending||0)>0){ m=await rpc('fn_ip_migrate',{p_n:10000}); } const months=[...new Set(UP.rows.map(o=>o.inquired_at).filter(Boolean).map(t=>String(t).slice(0,7)+'-01'))].sort(); const errs=await refreshAggMonths(months,'집계 갱신'); if(errs.length) toast('일부 월 집계 실패: '+errs.join(' / ')+' — 설정 탭 [집계 갱신]으로 재시도', 8000); }catch(e){ toast('집계 갱신 실패: '+sqlErr(e)+' — 설정 탭에서 [집계 갱신]을 다시 눌러주세요', 6000); } }
     $('#upMsg').innerHTML=`<span class="pill ok">완료</span> ${fmt(done)}행 저장 (배치 #${b.id})`; toast('업로드 완료'); UP=null; $('#upFile').value=''; loadBatches(); loading(false);
   }catch(e){ loading(false); $('#upMsg').innerHTML='<span class="pill bad">업로드 중단</span> '+esc(sqlErr(e))+' — 이미 저장된 행은 유지됩니다. 같은 파일을 다시 검증·업로드하면 유입은 갱신, 매출은 새 배치로 들어가므로 실패한 배치는 비활성화하세요.'; $('#upGo').disabled=false; }
 }
@@ -1528,7 +1528,16 @@ async function exportReport(kind){
 window.addEventListener('afterprint', ()=>{ /* 머리글은 화면에서는 숨김 유지 */ });
 
 /* ============================ 설정 ============================ */
-async function refreshAgg(){ loading(true,'IP 이관 확인 중…',10); try{ let m=await rpc('fn_ip_migrate',{p_n:10000}); let n=1; while((m.ip_pending||0)>0){ loading(true,`IP 이관 남은 ${fmt(m.ip_pending)}행 … (${n++}회차)`,50); m=await rpc('fn_ip_migrate',{p_n:10000}); } loading(true,'집계 갱신 중…',80); const r=await rpc('fn_refresh_agg',{}); toast(`집계 갱신 완료 (${fmt(r.media_rows)}행)`); showStatus(); }catch(e){ toast('실패: '+sqlErr(e),6000); } finally{ loading(false); } }
+// 집계 갱신: 전체 한 번에 돌리면 Supabase 90초 제한에 걸려 롤백되므로 월 단위로 반복 호출
+const monthEnd = m => { const d=new Date(m+'T00:00:00'); return new Date(d.getFullYear(), d.getMonth()+1, 0).toLocaleDateString('sv-SE'); };
+async function refreshAggMonths(months, label){
+  const errs=[]; let i=0;
+  for(const m of months){ i++; loading(true, `${label||'집계 갱신'} ${m.slice(0,7)} (${i}/${months.length})…`, Math.round(10+80*i/months.length));
+    try{ await rpc('fn_refresh_agg_range',{p_from:m, p_to:monthEnd(m)}); }catch(e){ errs.push(`${m.slice(0,7)}: ${sqlErr(e)}`); } }
+  return errs;
+}
+async function refreshAggAll(label){ const months=await rpc('fn_agg_months',{}); return refreshAggMonths(months, label); }
+async function refreshAgg(){ loading(true,'IP 이관 확인 중…',10); try{ let m=await rpc('fn_ip_migrate',{p_n:10000}); let n=1; while((m.ip_pending||0)>0){ loading(true,`IP 이관 남은 ${fmt(m.ip_pending)}행 … (${n++}회차)`,50); m=await rpc('fn_ip_migrate',{p_n:10000}); } const errs=await refreshAggAll('집계 갱신'); if(errs.length) toast('일부 월 갱신 실패: '+errs.join(' / '),8000); else toast('집계 갱신 완료 (전체 월)'); showStatus(); }catch(e){ toast('실패: '+sqlErr(e),6000); } finally{ loading(false); } }
 async function showStatus(){ try{ const st=await rpc('fn_data_status',{}); $('#setStatus').textContent=JSON.stringify(st,null,2); }catch(e){ $('#setStatus').textContent=sqlErr(e); } }
 
 init();
