@@ -313,6 +313,7 @@ create or replace function public.fn_channel_fallback(p_platform text, p_media t
     when p_platform = '플친' or p_media ilike '플친-%' then '카카오 친구톡'
     when p_platform = '대표전화' or p_media ilike '대표전화-%' then '전화·오프라인'
     when p_platform = '사이트' or p_media ilike '사이트-%' then '사이트(링크 없음)'
+    when p_platform = '엔카' or p_media = '엔카' then '기타'
     else '(미분류)' end
 $$;
 
