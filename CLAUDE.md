@@ -16,7 +16,7 @@
 
 ## 데이터 모델 (요점)
 - `inquiries` — 유입 문의 raw 50열. PK `inquiry_no`(문의번호), 업로드는 **upsert(같은 번호 갱신, 새 번호 누적)**. 트리거: `inq_date`(문의일시→날짜), `ip_raw`→`ip_hash`(SHA-256, 사설 IP 제외; 원문 IP 는 저장 안 함), `is_ip_dup`(같은 IP 7일 이내)
-- `sales` — 매출 raw 12열. **배치 단위 insert**, `upload_batches.is_active` 로 집계 포함 여부. 같은 기간 재업로드 시 이전 배치 비활성화
+- `sales` — 매출 raw 12열. **배치 단위 insert**, `upload_batches.is_active` 로 집계 포함 여부. 재업로드 시 계약일자 기간이 겹치는 활성 배치를 `fn_sales_batch_overlap` 로 찾아 업로드 후 자동 비활성화(체크 해제 가능). 겹치는 배치가 둘 이상 활성이면 같은 계약이 중복 합산됨 — 10월 57.9억 사례
 - `media_map` — `media_raw` PK → `media_std`, `media_type`(마케팅/내부/경비/미분류), `platform`, `brand`. **브랜드 의미 = coalesce(brand, media_std)** (브랜드 미지정 매체는 매체명 자체가 브랜드로 표시)
 - `car_map` — 차량명 raw → `model_std`, `brand`
 - `channel_map` — 유입링크 정규화 키(`fn_link_key`: '[M] google'→'M:google') → 광고채널. `agg_inquiry_channel`(일자×매체×링크키)로 집계, `fn_channel_period` 가 브랜드×채널 문의·계약·매출·광고비를 맞춤(수수료 채널은 기본 채널에 합산). 링크 없는 문의는 매체 플랫폼으로 추정(`fn_channel_fallback`), 사이트 유입은 '사이트(링크 없음)'. 매핑 탭에서 편집, 새 키는 집계 갱신 때 (미분류)로 자동 등록
