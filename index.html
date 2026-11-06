@@ -731,6 +731,7 @@ async function loadDash(){
     const took=((Date.now()-t0)/1000).toFixed(1);
     const inc = r => f.types.includes(r.media_type) && (!f.brands.length || f.brands.includes(brandOf(r)));
     const Pf=P.filter(inc), Mf=M.filter(inc); const Sf=(S||[]).filter(r=>!f.brands.length || f.brands.includes(r.brand));
+    const Mall=M.filter(r=>!f.brands.length || f.brands.includes(brandOf(r))); const sAll=sumRows(Mall,f,[]); const excl=['마케팅','내부','경비','미분류'].filter(t=>!f.types.includes(t)); const sExcl=sumRows(Mall.filter(r=>excl.includes(r.media_type)),f,[]);
     const PM=(PMraw||P).filter(inc);   // 월별 시리즈 (전월 대비·해석용)
     const SM=Sf.map(r=>({...r, period:String(r.period).slice(0,7)+'-01'}));
     if(st.brands && JSON.stringify(st.brands)!==JSON.stringify(BRANDS)){ BRANDS=st.brands; const keep=msSel('msBrand'); msFill('msBrand',BRANDS); document.querySelectorAll('#msBrand input').forEach(i=>i.checked=keep.includes(i.value)); msLabel('msBrand'); msFill('msTrend',BRANDS,trendRefilter); msFill('msDl',BRANDS); msFill('msLead',BRANDS,leadReload); if(!document.querySelector('#msSpend input')) msFill('msSpend',BRANDS); }
@@ -757,7 +758,7 @@ async function loadDash(){
     const roasOf=x=>x.cost? 100*x.revenue/x.cost : null, cpaOf=x=>x.cost&&x.dbSel? x.cost/x.dbSel : null, cpcOf=x=>x.cost&&x.contracts? x.cost/x.contracts : null, cvOf=x=>x.dbSel? 100*x.contracts/x.dbSel : null;
     $('#kpis').innerHTML=[
       ['광고비' + (f.brands.length? ` · ${f.brands.length===1? f.brands[0] : f.brands.length+'개 브랜드'}` : ' · 전체 브랜드'), won(s.cost), s.cost?'':'광고비 미입력 (광고비 탭)', kd(x=>x.cost,true)],
-      ['실행매출', won(s.revenue), `건당 ${won(s.contracts? s.revenue/s.contracts:null)}`, kd(x=>x.revenue,true)],
+      ['실행매출' + (excl.length? ` · ${f.types.join('·')}` : ''), won(s.revenue), excl.length? `<span title="매체유형 필터와 무관한 합계 (${excl.join('·')} ${won(sExcl.revenue)} 포함)">전체 ${won(sAll.revenue)} · 계약 ${fmt(sAll.contracts)}건</span> · 건당 ${won(s.contracts? s.revenue/s.contracts:null)}` : `건당 ${won(s.contracts? s.revenue/s.contracts:null)}`, kd(x=>x.revenue,true)],
       ['ROAS', s.cost? fmt(100*s.revenue/s.cost,1)+'%' : '-', '', kd(roasOf,true)],
       ['계약 수', fmt(s.contracts), '', kd(x=>x.contracts,true)],
       ['CPA (DB당 비용)', s.cost&&s.dbSel? fmt(s.cost/s.dbSel)+'원':'-', `DB ${fmt(s.dbSel)}건 (${f.dbLabel})`, kd(cpaOf,false)],
@@ -787,7 +788,8 @@ async function loadDash(){
     const oRoas=outliers(brSig.map(x=>100*x.revenue/x.cost)), oCpa=outliers(brSig.filter(x=>x.dbSel).map(x=>x.cost/x.dbSel));
     const bRow = x => { const c=metricCols(x); if(brSig.includes(x)){ c[6]+=outl(100*x.revenue/x.cost,oRoas); if(x.dbSel) c[7]+=outl(x.cost/x.dbSel,oCpa); } return [esc(x.k), ...c]; };
     const statRow = (label, fn) => ['<b>'+label+'</b>', '', '', '', '', '', '', fn(brC.map(x=>100*x.revenue/x.cost))!=null? fmt(fn(brC.map(x=>100*x.revenue/x.cost)),1)+'%':'-', fn(brC.filter(x=>x.dbSel).map(x=>x.cost/x.dbSel))!=null? won(fn(brC.filter(x=>x.dbSel).map(x=>x.cost/x.dbSel))):'-', fn(brC.filter(x=>x.contracts).map(x=>x.cost/x.contracts))!=null? won(fn(brC.filter(x=>x.contracts).map(x=>x.cost/x.contracts))):'-', fn(br.filter(x=>x.dbSel).map(x=>100*x.contracts/x.dbSel))!=null? fmt(fn(br.filter(x=>x.dbSel).map(x=>100*x.contracts/x.dbSel)),1)+'%':'-'];
-    renderTable('tBrand', ['브랜드',...METRIC_H], [...br.map(bRow), statRow('브랜드 평균', mean), statRow('브랜드 중앙값', median)], {foot:['합계',...metricCols(s)]});
+    const exclRows = excl.length? [[`<span class="muted">제외됨 · ${esc(excl.join('·'))} (필터로 뺀 유형)</span>`, ...metricCols(sExcl).map(v=>`<span class="muted">${v}</span>`)], ['<b>전체 (모든 유형)</b> <span class="muted">광고비·ROAS 는 마케팅 유형 기준이라 표시하지 않음</span>', ...metricCols({...sAll, cost:0})]] : [];
+    renderTable('tBrand', ['브랜드',...METRIC_H], [...br.map(bRow), statRow('브랜드 평균', mean), statRow('브랜드 중앙값', median), ...exclRows], {foot:['합계 (표시 유형)',...metricCols(s)]});
     // 해석과 제시점
     renderInsights({f, s, mstat, cur, prev, br, brC, mr, mrBig, lt, LD, LB, st});
     // 브랜드 × 채널
