@@ -38,6 +38,14 @@
   .card.folded .card-head:not(h2) > :not(h2):not(.fold){display:none}
   .card.folded h2.card-head > :not(.tip):not(.per):not(.fold){display:none}
   @media print{.fold{display:none}}
+  #detail{position:fixed;inset:0;z-index:120;background:var(--bg);display:flex;flex-direction:column}
+  #detail .dhead{display:flex;align-items:center;gap:12px;padding:10px 18px;background:var(--card);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  #detail .dtabs{display:flex;gap:4px} #detail .dtabs button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;color:#334155}
+  #detail .dtabs button.on{background:#e8efff;border-color:#c7d7fe;color:var(--accent);font-weight:700}
+  #detail .dbody{flex:1;overflow:auto;padding:14px 18px} #detail .dsec{display:none} #detail .dsec.on{display:block}
+  body.detail-open{overflow:hidden}
+  .brandlink{color:var(--accent);cursor:pointer;text-decoration:underline dotted}
+  @media print{#detail{position:static;display:block !important} #detail .dhead{display:none} #detail .dsec{display:block !important} #detailLaunch{display:none !important}}
   .per{display:inline-block;font-size:11px;font-weight:500;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:1px 8px;margin-left:8px;vertical-align:middle;white-space:nowrap}
   .card h3{font-size:13px;margin:14px 0 6px;color:var(--muted)}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
@@ -206,13 +214,13 @@
       <div><h3 id="chTrendTitle">광고비 · 실행매출 · ROAS</h3><canvas id="chTrend" style="max-height:300px"></canvas></div>
       <div><h3>DB · 계약 · 전환율</h3><canvas id="chTrend2" style="max-height:300px"></canvas></div>
     </div>
-    <div style="margin-top:12px"><h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">매체별 추이 비교 <span class="tip" title="선택한 매체(없으면 선택 브랜드 안에서 DB 많은 순 6개)를 기간별로 겹쳐 비교. 지표를 바꿔 볼 수 있습니다">ⓘ</span>
+    <div class="card" data-detail="media"><h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">매체별 추이 비교 <span class="tip" title="선택한 매체(없으면 선택 브랜드 안에서 DB 많은 순 6개)를 기간별로 겹쳐 비교. 지표를 바꿔 볼 수 있습니다">ⓘ</span>
       <select id="tmMetric" style="padding:3px 6px;font-size:12px" onchange="trendRefilter()"><option value="dbSel">DB수</option><option value="contracts">계약수</option><option value="cv">전환율(%)</option><option value="revenue">실행매출</option></select>
       <span class="muted" id="tmNote"></span></h3><canvas id="chTrendMedia" style="max-height:320px"></canvas></div>
     <details class="tbl"><summary>표로 보기</summary><div class="tw" style="margin-top:6px"><table id="tTrend"></table></div></details>
   </div>
 
-  <div class="card">
+  <div class="card" data-detail="channel">
     <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">브랜드 × 채널 성과 <span class="tip" title="유입링크(utm/[M] 태그)로 문의·계약을 광고채널로 나누고, 같은 브랜드×채널의 광고비(수수료 포함)와 맞춥니다. 링크가 없는 문의는 매체 플랫폼으로 추정(메타·당근·틱톡·플친·대표전화), 사이트 유입인데 링크가 없으면 '사이트(링크 없음)'. 매핑은 매핑 탭 → 유입링크→채널">ⓘ</span>
       <select id="chBrandSel" style="padding:3px 6px;font-size:12px" onchange="renderChannel()"></select>
       <span class="muted" id="chNote"></span></h2>
@@ -223,25 +231,26 @@
     <div class="tw" style="margin-top:8px"><table id="tChannel"></table></div>
   </div>
   <div class="card"><h2>브랜드별 요약 <span class="tip" title="매체 마스터의 브랜드 기준. 브랜드가 없는 매체는 매체명 그대로 표시. 광고비·ROAS·CPA는 브랜드 단위로 집계. 하단에 브랜드 평균·중앙값, 이상치는 ▲▼ 배지">ⓘ</span></h2><div class="tw"><table id="tBrand"></table></div>
-    <h3>브랜드 × 광고채널 광고비 구성비 <span class="tip" title="브랜드별 광고비를 100%로 놓고 채널 비중을 표시. 막대 끝 숫자는 광고비 합계. 광고비가 큰 브랜드 순">ⓘ</span></h3><canvas id="chSpendCh" style="max-height:360px"></canvas>
+  </div>
+  <div class="card" data-detail="channel"><h3>브랜드 × 광고채널 광고비 구성비 <span class="tip" title="브랜드별 광고비를 100%로 놓고 채널 비중을 표시. 막대 끝 숫자는 광고비 합계. 광고비가 큰 브랜드 순">ⓘ</span></h3><canvas id="chSpendCh" style="max-height:360px"></canvas>
     <details class="tbl"><summary>금액 표로 보기</summary><div class="tw" style="margin-top:6px"><table id="tSpendCh"></table></div></details></div>
-  <div class="grid2">
+  <div class="grid2" data-detail="media">
     <div class="card"><h2>플랫폼별</h2><div class="tw"><table id="tPlatform"></table></div></div>
     <div class="card"><h2>매체별 TOP 12 <span class="tip" title="왼쪽: DB수(중복 제외 기준), 오른쪽: 같은 매체의 문의→계약 전환율. 두 차트의 매체 순서는 동일">ⓘ</span></h2>
       <div class="grid2"><div><h3>DB수</h3><canvas id="chMedia" style="max-height:400px"></canvas></div><div><h3>전환율 (%)</h3><canvas id="chMediaCv" style="max-height:400px"></canvas></div></div></div>
   </div>
-  <div class="card"><h2>매체별 성과 <span class="tip" title="선택 기간 합계. 리드타임은 정상 계약 기준. 광고비는 브랜드 단위라 매체별 표에는 없음. 전환율·리드타임 이상치는 ▲▼ 배지(IQR 기준)">ⓘ</span></h2><div class="tw" style="max-height:560px"><table id="tMedia"></table></div></div>
+  <div class="card" data-detail="media"><h2>매체별 성과 <span class="tip" title="선택 기간 합계. 리드타임은 정상 계약 기준. 광고비는 브랜드 단위라 매체별 표에는 없음. 전환율·리드타임 이상치는 ▲▼ 배지(IQR 기준)">ⓘ</span></h2><div class="tw" style="max-height:560px"><table id="tMedia"></table></div></div>
 
-  <div class="grid2">
+  <div class="grid2" data-detail="car">
     <div class="card"><h2>문의 많은 차량 TOP 10 <span class="tip" title="브랜드 색 배지 + 문의(DB) 막대. 숫자는 DB(제외후) / 계약 / 전환율">ⓘ</span></h2><div id="carInqBars"></div><details class="tbl"><summary>표로 보기</summary><div class="tw"><table id="tCarInq"></table></div></details></div>
     <div class="card"><h2>계약 많은 차량 TOP 10 <span class="tip" title="브랜드 색 배지 + 계약 막대. 숫자는 계약 / 실행매출 / 전환율">ⓘ</span></h2><div id="carSaleBars"></div><details class="tbl"><summary>표로 보기</summary><div class="tw"><table id="tCarSale"></table></div></details></div>
   </div>
-  <div class="grid2">
+  <div class="grid2" data-detail="car">
     <div class="card"><h2>차량 브랜드별 계약 비율</h2><canvas id="chCarBrand" style="max-height:320px"></canvas></div>
     <div class="card"><h2>차량 브랜드별 전환율 <span class="tip" title="브랜드별 계약 ÷ DB(제외후). 계약 30건 이상 브랜드만">ⓘ</span></h2><canvas id="chCarBrandCv" style="max-height:320px"></canvas></div>
   </div>
 
-  <div class="card">
+  <div class="card" data-detail="lead">
     <div class="row" style="align-items:center;margin-bottom:6px"><h2 style="margin:0">리드타임 <span class="muted">(계약일자 − 문의일자, 음수·1년 초과·경비 제외)</span></h2>
       <div class="ms" id="msLead" style="margin-left:12px"><button class="btn sec sm" type="button" onclick="this.parentNode.classList.toggle('open')">리드타임 브랜드: 전체 ▾</button><div class="pop"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msLead',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msLead',false)">전체 해제</button></div><div class="list"></div></div></div>
       <div class="chk" id="fLeadGrain" style="margin-left:8px">
@@ -278,6 +287,29 @@
     <div class="grid2" style="margin-top:12px">
       <div><h3>매체별 (계약 5건 이상)</h3><div class="tw"><table id="tLeadMedia"></table></div></div>
       <div><h3>차량별 (계약 5건 이상)</h3><div class="tw"><table id="tLeadCar"></table></div></div>
+    </div>
+  </div>
+  <div class="card" id="detailLaunch" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <b style="margin-right:4px">상세 지표</b>
+    <button class="btn sec" type="button" onclick="openDetail('channel')">브랜드 × 채널 성과</button>
+    <button class="btn sec" type="button" onclick="openDetail('media')">매체 · 플랫폼</button>
+    <button class="btn sec" type="button" onclick="openDetail('car')">차량</button>
+    <button class="btn sec" type="button" onclick="openDetail('lead')">리드타임 · 단기 전환율</button>
+    <span class="muted" style="margin-left:auto">브랜드별 요약 표의 브랜드명을 누르면 그 브랜드 상세로 바로 이동</span>
+  </div>
+  <div id="detail" style="display:none">
+    <div class="dhead">
+      <div class="dtabs">
+        <button type="button" data-dt="channel" onclick="detailTab('channel')">브랜드 × 채널</button>
+        <button type="button" data-dt="media" onclick="detailTab('media')">매체 · 플랫폼</button>
+        <button type="button" data-dt="car" onclick="detailTab('car')">차량</button>
+        <button type="button" data-dt="lead" onclick="detailTab('lead')">리드타임 · 단기 전환율</button>
+      </div>
+      <b id="detailTitle" style="font-size:15px"></b><span class="muted" id="detailCtx"></span>
+      <button class="btn sec sm" type="button" onclick="closeDetail()" style="margin-left:auto">닫기 ✕</button>
+    </div>
+    <div class="dbody">
+      <div class="dsec" data-ds="channel"></div><div class="dsec" data-ds="media"></div><div class="dsec" data-ds="car"></div><div class="dsec" data-ds="lead"></div>
     </div>
   </div>
 </section>
@@ -528,7 +560,7 @@ async function selectAll(table, build){ // 1000행 제한 우회 페이지네이
 /* ============================ 인증 ============================ */
 let recovering=false;
 async function init(){
-  try{ installFolds(); }catch(e){ console.warn('fold', e); }
+  try{ setupDetail(); installFolds(); }catch(e){ console.warn('layout', e); }
   const cfg=getCfg();
   if(!cfg){ $('#cfgBox').style.display='block'; $('#loginBox').style.display='none'; return; }
   sb = supabase.createClient(cfg.url, cfg.key);
@@ -713,6 +745,26 @@ function installFolds(){
     pg.insertBefore(bar, cards[0].id==='filterCard'? cards[1] : (pg.querySelector('#filterCard')?.nextElementSibling || cards[0]));
   });
 }
+// ---- 상세 지표 레이어: 메인은 요약만, 세부 카드는 data-detail 로 표시한 전체 화면 레이어로 이동 ----
+const DETAIL_TITLES={channel:'브랜드 × 채널 성과',media:'매체 · 플랫폼',car:'차량',lead:'리드타임 · 단기 전환율'};
+function setupDetail(){
+  const d=$('#detail'); if(!d||d._ready) return; d._ready=true;
+  document.querySelectorAll('#p-dash [data-detail]').forEach(el=>{ const sec=d.querySelector(`.dsec[data-ds="${el.dataset.detail}"]`); if(sec) sec.appendChild(el); });
+  const brandCard=$('#tBrand')?.closest('.card'); const launch=$('#detailLaunch'); if(brandCard&&launch) brandCard.after(launch);
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && d.style.display!=='none') closeDetail(); });
+}
+function detailTab(t){ const d=$('#detail'); d.querySelectorAll('.dtabs button').forEach(b=>b.classList.toggle('on', b.dataset.dt===t)); d.querySelectorAll('.dsec').forEach(x=>x.classList.toggle('on', x.dataset.ds===t)); d._tab=t; $('#detailTitle').textContent=DETAIL_TITLES[t]||'';
+  setTimeout(()=>Object.values(charts).forEach(c=>{ try{ c.resize(); }catch(e){} }), 30); }
+function openDetail(t, brand){
+  const d=$('#detail'); setupDetail(); d.style.display='flex'; document.body.classList.add('detail-open'); detailTab(t||'channel');
+  $('#detailCtx').textContent = brand? `브랜드: ${brand}` : '';
+  if(brand){
+    const sel=$('#chBrandSel'); if(sel && [...sel.options].some(o=>o.value===brand)){ sel.value=brand; try{ renderChannel(); }catch(e){} }
+    const li=document.querySelectorAll('#msLead input'); if(li.length){ let hit=false; li.forEach(i=>{ i.checked=(i.value===brand); hit=hit||i.checked; }); if(hit){ msLabel('msLead'); $('#msLead')._dirty=true; try{ leadReload(); }catch(e){} } }
+  }
+  d.querySelector('.dbody').scrollTop=0;
+}
+function closeDetail(){ $('#detail').style.display='none'; document.body.classList.remove('detail-open'); }
 function stampPeriods(){
   document.querySelectorAll('#p-dash .card > h2, #p-dash .card > div > h2').forEach(h=>{
     let tag=h.querySelector('.per'); if(!tag){ tag=document.createElement('span'); tag.className='per'; h.appendChild(tag); }
@@ -823,7 +875,7 @@ async function loadDash(){
     const br=brandKeys.map(k=>({k,...sumRows(byB.get(k)||[],f,bySB.get(k)||[])})).sort((a,b)=>b.dbSel-a.dbSel);
     const brC=br.filter(x=>x.cost>0); const brMedCost=median(brC.map(x=>x.cost))||0; const brSig=brC.filter(x=>x.cost>=Math.max(3e7, brMedCost*0.1));
     const oRoas=outliers(brSig.map(x=>100*x.revenue/x.cost)), oCpa=outliers(brSig.filter(x=>x.dbSel).map(x=>x.cost/x.dbSel));
-    const bRow = x => { const c=metricCols(x); if(brSig.includes(x)){ c[6]+=outl(100*x.revenue/x.cost,oRoas); if(x.dbSel) c[7]+=outl(x.cost/x.dbSel,oCpa); } return [esc(x.k), ...c]; };
+    const bRow = x => { const c=metricCols(x); if(brSig.includes(x)){ c[6]+=outl(100*x.revenue/x.cost,oRoas); if(x.dbSel) c[7]+=outl(x.cost/x.dbSel,oCpa); } return [`<span class="brandlink" title="이 브랜드의 상세 지표 열기" onclick="openDetail('channel', this.dataset.b)" data-b="${esc(x.k)}">${esc(x.k)}</span>`, ...c]; };
     const statRow = (label, fn) => ['<b>'+label+'</b>', '', '', '', '', '', '', fn(brC.map(x=>100*x.revenue/x.cost))!=null? fmt(fn(brC.map(x=>100*x.revenue/x.cost)),1)+'%':'-', fn(brC.filter(x=>x.dbSel).map(x=>x.cost/x.dbSel))!=null? won(fn(brC.filter(x=>x.dbSel).map(x=>x.cost/x.dbSel))):'-', fn(brC.filter(x=>x.contracts).map(x=>x.cost/x.contracts))!=null? won(fn(brC.filter(x=>x.contracts).map(x=>x.cost/x.contracts))):'-', fn(br.filter(x=>x.dbSel).map(x=>100*x.contracts/x.dbSel))!=null? fmt(fn(br.filter(x=>x.dbSel).map(x=>100*x.contracts/x.dbSel)),1)+'%':'-'];
     const exclRows = excl.length? [[`<span class="muted">제외됨 · ${esc(excl.join('·'))} (필터로 뺀 유형)</span>`, ...metricCols(sExcl).map(v=>`<span class="muted">${v}</span>`)], ['<b>전체 (모든 유형)</b> <span class="muted">광고비·ROAS 는 마케팅 유형 기준이라 표시하지 않음</span>', ...metricCols({...sAll, cost:0})]] : [];
     renderTable('tBrand', ['브랜드',...METRIC_H], [...br.map(bRow), statRow('브랜드 평균', mean), statRow('브랜드 중앙값', median), ...exclRows], {foot:['합계 (표시 유형)',...metricCols(s)]});

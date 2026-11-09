@@ -22,6 +22,7 @@
 - `channel_map` — 유입링크 정규화 키(`fn_link_key`: '[M] google'→'M:google') → 광고채널. `agg_inquiry_channel`(일자×매체×링크키)로 집계, `fn_channel_period` 가 브랜드×채널 문의·계약·매출·광고비를 맞춤(수수료 채널은 기본 채널에 합산). 링크 없는 문의는 매체 플랫폼으로 추정(`fn_channel_fallback`), 사이트 유입은 '사이트(링크 없음)'. 매핑 탭에서 편집, 새 키는 집계 갱신 때 (미분류)로 자동 등록
 - `ad_spend` — (spend_date, brand, channel) PK. 채널 12종 + 수수료 채널 3종(구글 애즈·메타 광고·블로그 인플루언서 ×15%). `source` 수기/api
 - 집계: `agg_inquiry_media`, `agg_inquiry_car`(PostgREST 1,000행 한도·타임아웃 회피). 갱신은 **월 단위** `fn_refresh_agg_range(p_from,p_to)` 를 화면이 `fn_agg_months()` 목록으로 반복 호출(전체 한 번에 도는 `fn_refresh_agg()` 는 Supabase 90초 제한에 걸려 롤백됨 — 쓰지 말 것); 유입 업로드 끝에는 업로드된 월만 갱신, 설정 탭 [집계 갱신]은 전체 월
+- 화면 2층 구조: 대시보드 메인 = 필터·KPI·해석과 제시점·기간별 추이·브랜드별 요약·[상세 지표] 버튼만. `data-detail="channel|media|car|lead"` 가 붙은 카드는 `setupDetail()` 이 전체 화면 레이어 `#detail`(탭 4개)로 옮김. 브랜드별 요약의 브랜드명 클릭 → `openDetail('channel', 브랜드)` 가 채널 select·리드타임 브랜드를 그 브랜드로 맞춤. 인쇄 시 레이어 전체 펼침
 - 화면: 제목(h2)이 있는 카드마다 접기/펼치기 버튼(`installFolds`, 상태는 localStorage `ks_fold_v1`, 키=탭|제목), 탭 상단 [모두 펼치기/접기]. 펼칠 때 Chart.js `resize()` 호출
 - 조회 함수: `fn_dashboard`(화면 1회 호출로 status,P,M,S,C,L0,LM,LC,LB,LMB,LPL,LD,LDM,LT,LQ,LQT,CH,CHT 반환), `fn_media_period`, `fn_spend_period`, `fn_car_summary`, `fn_leadtime*`, `fn_data_status`, `fn_activity_log`
 - 권한: RLS 는 `authenticated` 전용. anon 은 읽기도 불가. 관리자(`admin_users`)만 로그 탭. service_role 키는 앱에 절대 넣지 않음(원장 Vercel 환경변수에만)
