@@ -12,7 +12,7 @@ Supabase 는 GitHub 과 자동 연결되어 있지 않으므로, 아래 표의 "
 | `2026-11-05_01_집계_구간갱신.sql` | `fn_refresh_agg_range(p_from,p_to)`, `fn_agg_months` — 월 단위 집계 갱신(90초 제한 회피). 화면은 이 함수를 월별 반복 호출 | 적용 (2026-11-06 16:21 사용자 확인) | `select proname from pg_proc where proname='fn_refresh_agg_range';` → 1행 |
 | `2026-11-06_01_엔카_KS오토플랜_귀속.sql` | `media_map` 엔카 → 브랜드 KS오토플랜·플랫폼 엔카, `fn_channel_fallback` 에 엔카→'기타' 규칙 (수기 ROAS 시트와 귀속 기준 일치) | 적용 (2026-11-06 16:21 사용자 확인) | `select brand from media_map where media_raw='엔카';` → KS오토플랜 |
 | `2026-11-06_02_매출배치_기간중복.sql` | `fn_sales_batch_overlap` — 매출 업로드 검증 때 계약일자 기간이 겹치는 활성 배치를 표시하고 업로드 후 자동 비활성화(체크 기본 켜짐) | 적용 (2026-11-06 16:21 사용자 확인) | `select proname from pg_proc where proname='fn_sales_batch_overlap';` → 1행 |
-| `2026-11-09_01_매체별_유입키워드.sql` | `fn_media_keywords(p_medias)` — 매체 마스터에 매체별 상위 유입키워드·유입링크 열 표시 | **미적용** | `select proname from pg_proc where proname='fn_media_keywords';` → 1행 |
+| `2026-11-09_01_매체별_유입키워드.sql` | `fn_media_keywords(p_medias)` — 매체 마스터에 매체별 상위 유입키워드·유입링크 열 표시 | 적용 (2026-11-09 16:35 사용자 확인) | `select proname from pg_proc where proname='fn_media_keywords';` → 1행 |
 | `applied/2026-10-21_매체브랜드매핑_반영.sql` | media_map 브랜드·유형 일괄 갱신 (데이터 변경) | 적용 (2026-10-21) | 대시보드 브랜드 목록에 2팀 브랜드 표시 |
 
 ## 적용 절차
