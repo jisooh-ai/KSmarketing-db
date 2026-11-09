@@ -217,7 +217,7 @@
       <select id="chBrandSel" style="padding:3px 6px;font-size:12px" onchange="renderChannel()"></select>
       <span class="muted" id="chNote"></span></h2>
     <div class="grid2">
-      <div><h3>채널별 ROAS <span class="muted">(막대 = ROAS, 라벨 = 광고비)</span></h3><canvas id="chChanRoas" style="max-height:340px"></canvas></div>
+      <div><h3>채널별 ROAS <span class="muted">(막대 = ROAS · 채널명 아래 = 광고비 · 광고비가 없는 채널은 ROAS 미산출)</span></h3><canvas id="chChanRoas" style="max-height:460px"></canvas></div>
       <div><h3>채널별 ROAS 월별 추이 <span class="muted">(광고비 있는 채널만)</span></h3><canvas id="chChanTrend" style="max-height:340px"></canvas></div>
     </div>
     <div class="tw" style="margin-top:8px"><table id="tChannel"></table></div>
@@ -906,7 +906,7 @@ function renderChannel(){
   $('#chNote').textContent = brand? `광고비 있는 채널 ${paid.length}개 · ROAS 중앙값 ${medR!=null?fmt(medR,0)+'%':'-'}${unm?` · 링크 없는 계약 ${fmt(unm)}건은 채널 미배정`:''}` : '브랜드를 선택하세요';
   const col=ch=>CH_COLORS2[ch]||hashColor(ch);
   chart('chChanRoas',{type:'bar',data:{labels:paid.map(r=>r.ch),datasets:[{label:'ROAS(%)',data:paid.map(r=>+roas(r).toFixed(0)),backgroundColor:paid.map(r=>col(r.ch))}]},
-    options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{ const r=paid[c.dataIndex]; return `ROAS ${c.parsed.x}% · 광고비 ${won(r.cost)} · 매출 ${won(r.rev)} · 계약 ${fmt(r.c)}`; }}}},scales:{x:{beginAtZero:true,ticks:{callback:v=>v+'%'}}}}});
+    options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{ const r=paid[c.dataIndex]; return `ROAS ${c.parsed.x}% · 광고비 ${won(r.cost)} · 매출 ${won(r.rev)} · 계약 ${fmt(r.c)}`; }}}},scales:{x:{beginAtZero:true,ticks:{callback:v=>v+'%'}},y:{ticks:{autoSkip:false,font:{size:11},callback:(v,i)=>{ const r=paid[i]; return r? [r.ch, (r.cost? won(r.cost) : '광고비 없음')+(r.c? ` · 계약 ${fmt(r.c)}`:'')] : v; }}}}}});
   // 월별 추이: 광고비 상위 6채널
   const top=paid.slice(0,6).map(r=>r.ch); const periods=[...new Set(CHT.map(r=>r.period))].sort(); const byC=groupBy(CHT, r=>r.channel);
   chart('chChanTrend',{data:{labels:periods.map(p=>p.slice(0,7)),datasets:top.map(ch=>{ const byP=groupBy(byC.get(ch)||[], r=>r.period); return {type:'line',label:ch,data:periods.map(p=>{ const rs=byP.get(p)||[]; const c=rs.reduce((a,r)=>a+ +r.cost,0), v=rs.reduce((a,r)=>a+ +r.revenue,0); return c? +(100*v/c).toFixed(0) : null; }),borderColor:col(ch),backgroundColor:col(ch),tension:.2,borderWidth:2,pointRadius:2,spanGaps:true}; })},
