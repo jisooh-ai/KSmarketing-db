@@ -1375,13 +1375,25 @@ async function loadMediaMap(){
     let rows=MM.filter(r=>(f==='all'||r.media_type==='미분류') && (!s||r.media_raw.includes(s)||(r.media_std||'').includes(s))).sort((a,b)=>b.inquiry_count-a.inquiry_count);
     $('#mmMsg').textContent=`${rows.length}종 표시 / 전체 ${MM.length}종`;
     const types=['마케팅','내부','경비','미분류'];
-    renderTable('tMediaMap', ['매체 원문(유입)','유입DB','매출건','표준매체명','유형','플랫폼','브랜드','메모'], rows.map(r=>[esc(r.media_raw), fmt(r.inquiry_count), fmt(r.sales_count),
+    renderTable('tMediaMap', ['매체 원문(유입)','유입키워드 · 유입링크 (상위)','유입DB','매출건','표준매체명','유형','플랫폼','브랜드','메모'], rows.map(r=>[esc(r.media_raw), `<div class="mmkw" data-m="${esc(r.media_raw)}" style="max-width:300px;font-size:11.5px;color:#475569;line-height:1.35">…</div>`, fmt(r.inquiry_count), fmt(r.sales_count),
       `<input data-k="${esc(r.media_raw)}" data-f="media_std" value="${esc(r.media_std)}" style="width:220px" onchange="mmDirty(this)">`,
       `<select data-k="${esc(r.media_raw)}" data-f="media_type" onchange="mmDirty(this)">${types.map(t=>`<option ${t===r.media_type?'selected':''}>${t}</option>`).join('')}</select>`,
       `<input data-k="${esc(r.media_raw)}" data-f="platform" value="${esc(r.platform||'')}" style="width:100px" onchange="mmDirty(this)">`,
       `<input data-k="${esc(r.media_raw)}" data-f="brand" value="${esc(r.brand||'')}" style="width:160px" onchange="mmDirty(this)">`,
-      `<input data-k="${esc(r.media_raw)}" data-f="memo" value="${esc(r.memo||'')}" style="width:140px" onchange="mmDirty(this)">`]), {left:[0,3,4,5,6,7]});
+      `<input data-k="${esc(r.media_raw)}" data-f="memo" value="${esc(r.memo||'')}" style="width:140px" onchange="mmDirty(this)">`]), {left:[0,1,4,5,6,7,8]});
+    loadMediaKeywords(rows.map(r=>r.media_raw));
   }catch(e){ toast('매체 마스터 조회 실패: '+sqlErr(e)); }
+}
+// 매체별 주요 유입키워드·링크 (fn_media_keywords). 서버 미적용이면 조용히 비움
+async function loadMediaKeywords(medias){
+  if(!medias.length) return;
+  let kw={}; try{ kw=await rpc('fn_media_keywords',{p_medias:medias})||{}; }catch(e){ document.querySelectorAll('#tMediaMap .mmkw').forEach(d=>d.textContent='(서버 미적용: fn_media_keywords)'); return; }
+  document.querySelectorAll('#tMediaMap .mmkw').forEach(d=>{
+    const items=kw[d.dataset.m]||[]; const tot=items.reduce((a,x)=>a+x.n,0);
+    if(!items.length){ d.textContent='—'; return; }
+    const line=x=>{ const parts=[x.k, x.l].filter(Boolean); return `<span title="${esc(parts.join(' / ')||'키워드·링크 없음')}">${parts.length? esc(parts.join(' · ')) : '<i>키워드·링크 없음</i>'}</span> <b>${fmt(x.n)}</b>`; };
+    d.innerHTML=items.slice(0,3).map(line).join('<br>') + (items.length>3? `<details style="display:inline"><summary style="cursor:pointer;color:var(--accent)">+${items.length-3}</summary>${items.slice(3).map(line).join('<br>')}</details>` : '');
+  });
 }
 const mmDirtyKeys=new Set(); function mmDirty(el){ mmDirtyKeys.add(el.dataset.k); el.style.background='#fff7e6'; }
 async function saveMediaMap(){
