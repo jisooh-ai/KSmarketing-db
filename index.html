@@ -30,6 +30,14 @@
   section.page.on{display:block}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
   .card h2{font-size:15px;margin:0 0 10px}
+  .fold{float:right;order:99;margin-left:auto;border:1px solid var(--line);background:#fff;color:#475569;border-radius:6px;width:24px;height:22px;line-height:20px;font-size:12px;cursor:pointer;padding:0;vertical-align:middle}
+  .fold:hover{background:#f1f5f9}
+  .card.folded > :not(.card-head){display:none !important}
+  .card.folded{padding-bottom:8px} .card.folded .card-head h2, .card.folded > h2.card-head{margin-bottom:0}
+  .card-head:not(h2){display:flex;flex-wrap:wrap;align-items:center} .card-head:not(h2) > .fold{margin-left:auto;float:none}
+  .card.folded .card-head:not(h2) > :not(h2):not(.fold){display:none}
+  .card.folded h2.card-head > :not(.tip):not(.per):not(.fold){display:none}
+  @media print{.fold{display:none}}
   .per{display:inline-block;font-size:11px;font-weight:500;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:1px 8px;margin-left:8px;vertical-align:middle;white-space:nowrap}
   .card h3{font-size:13px;margin:14px 0 6px;color:var(--muted)}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
@@ -520,6 +528,7 @@ async function selectAll(table, build){ // 1000행 제한 우회 페이지네이
 /* ============================ 인증 ============================ */
 let recovering=false;
 async function init(){
+  try{ installFolds(); }catch(e){ console.warn('fold', e); }
   const cfg=getCfg();
   if(!cfg){ $('#cfgBox').style.display='block'; $('#loginBox').style.display='none'; return; }
   sb = supabase.createClient(cfg.url, cfg.key);
@@ -676,6 +685,34 @@ function renderTrendMedia(){
 }
 // 조회 조건 꼬리표: 대시보드 모든 카드 제목에 "기간 · 기준일 · 중복 기준 · 브랜드" 표시
 function periodTag(extra){ const f=DASH.f; if(!f) return ''; const b = f.brands&&f.brands.length? (f.brands.length===1? f.brands[0] : `${f.brands.length}개 브랜드`) : '전체 브랜드'; return `${f.from} ~ ${f.to} · ${f.basis==='inquiry'?'문의일자':'계약일자'} 기준 · ${f.dbLabel} · ${b}${extra?' · '+extra:''}`; }
+const FOLD_KEY='ks_fold_v1';
+function foldState(){ try{ return JSON.parse(localStorage.getItem(FOLD_KEY)||'{}'); }catch(e){ return {}; } }
+function cardKey(card){ const h=card.querySelector('h2'); const page=card.closest('[id^=p-]')?.id||''; const t=(h?.childNodes[0]?.textContent||h?.textContent||'').trim().slice(0,40); return page+'|'+t; }
+function setFold(card, folded, save=true){
+  card.classList.toggle('folded', folded); const b=card.querySelector(':scope > .card-head .fold, :scope > h2.card-head .fold'); if(b){ b.textContent=folded?'＋':'－'; b.title=folded?'펼치기':'접기'; }
+  if(save){ const st=foldState(); st[cardKey(card)]=folded?1:0; try{ localStorage.setItem(FOLD_KEY, JSON.stringify(st)); }catch(e){} }
+  if(!folded) setTimeout(()=>Object.values(charts).forEach(c=>{ try{ c.resize(); }catch(e){} }), 30);
+}
+function installFolds(){
+  const st=foldState();
+  document.querySelectorAll('.card').forEach(card=>{
+    if(card.closest('#login')||card.closest('#loading')||card.id==='filterCard') return;
+    const h=card.querySelector(':scope > h2, :scope > div > h2'); if(!h || card.querySelector('.fold')) return;
+    const head = h.parentElement===card ? h : h.parentElement; head.classList.add('card-head');
+    const b=document.createElement('button'); b.type='button'; b.className='fold'; b.textContent='－'; b.title='접기';
+    b.onclick=e=>{ e.stopPropagation(); setFold(card, !card.classList.contains('folded')); };
+    if(head===h) h.appendChild(b); else head.appendChild(b);
+    if(st[cardKey(card)]) setFold(card, true, false);
+  });
+  document.querySelectorAll('.foldall').forEach(x=>x.remove());
+  document.querySelectorAll('[id^=p-]').forEach(pg=>{
+    const cards=[...pg.querySelectorAll('.card')].filter(c=>c.querySelector(':scope > .card-head, :scope > h2.card-head')); if(cards.length<3) return;
+    const bar=document.createElement('div'); bar.className='row foldall-bar' ; bar.style.cssText='justify-content:flex-end;margin:-4px 0 8px;gap:6px';
+    bar.innerHTML='<button class="btn sec sm foldall" type="button">모두 펼치기</button><button class="btn sec sm foldall" type="button">모두 접기</button>';
+    const [open,close]=bar.querySelectorAll('button'); open.onclick=()=>cards.forEach(c=>setFold(c,false)); close.onclick=()=>cards.forEach(c=>setFold(c,true));
+    pg.insertBefore(bar, cards[0].id==='filterCard'? cards[1] : (pg.querySelector('#filterCard')?.nextElementSibling || cards[0]));
+  });
+}
 function stampPeriods(){
   document.querySelectorAll('#p-dash .card > h2, #p-dash .card > div > h2').forEach(h=>{
     let tag=h.querySelector('.per'); if(!tag){ tag=document.createElement('span'); tag.className='per'; h.appendChild(tag); }
