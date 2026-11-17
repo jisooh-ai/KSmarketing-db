@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>마케팅 퍼포먼스 DB</title>
+<title>KS 마케팅 성과 보드</title>
 <!-- ===================== 설정 =====================
      Supabase 프로젝트 > Settings > API 의 값을 아래 두 줄에 넣으세요.
      (비워두면 앱의 [설정] 탭에서 입력해 브라우저에 저장할 수 있습니다) -->
@@ -134,7 +134,7 @@
 
 <div id="login">
   <div class="card">
-    <h2>마케팅 퍼포먼스 DB</h2>
+    <h2>KS 마케팅 성과 보드</h2>
     <div id="cfgBox" style="display:none" class="muted">접속 정보가 설정되지 않았습니다. <code>index.html</code> 상단의 <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code>에 값을 넣어 다시 배포하세요.</div>
     <div id="loginBox">
       <div class="row" style="margin:8px 0"><div style="flex:1"><label>이메일 또는 아이디</label><input id="email" type="text" autocomplete="username"></div></div>
@@ -153,7 +153,7 @@
 </div>
 
 <header><div class="bar">
-  <h1>마케팅 퍼포먼스 DB</h1>
+  <h1>KS 마케팅 성과 보드</h1>
   <nav>
     <button data-p="dash" class="on">대시보드</button>
     <button data-p="upload">업로드</button>
@@ -1638,7 +1638,7 @@ async function delAdmin(e){ if(!confirm(e+' 의 관리자 권한을 제거할까
 function reportMeta(){
   const f=DASH.f||filters(); const types=f.types.join(', '); const brands=f.brands&&f.brands.length? f.brands.join(', ') : '전체';
   const trend=document.querySelector('#fGrain input:checked')?.value; const tsel=typeof trendSel==='function'? trendSel() : null; const lsel=typeof leadSel==='function'? leadSel() : null;
-  return { title:'마케팅 퍼포먼스 보고서', period:`${f.from} ~ ${f.to}`, basis: f.basis==='inquiry'?'문의일자':'계약일자', brands, dedup:f.dbLabel, types,
+  return { title:'KS 마케팅 성과 보고서', period:`${f.from} ~ ${f.to}`, basis: f.basis==='inquiry'?'문의일자':'계약일자', brands, dedup:f.dbLabel, types,
            trend:{month:'월별',week:'주별',day:'일별',year:'연별'}[trend]||trend, trendBrands: tsel? tsel.join(', ') : '전체', leadBrands: lsel? lsel.join(', ') : '전체',
            at: kst(new Date().toISOString()), by: user?.email||'' };
 }
@@ -1672,7 +1672,7 @@ async function exportReport(kind){
     const css=[...document.querySelectorAll('style')].map(x=>x.textContent).join('\n');
     const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(m.title)} ${esc(m.period)}</title><style>${css}
       header,#login,#loading{display:none} main{max-width:1400px;margin:0 auto;padding:16px} .rpt-head{display:block} th{position:static}</style></head>
-      <body><main>${sec.outerHTML}</main><div class="muted" style="text-align:center;padding:12px">마케팅 퍼포먼스 DB · 생성 ${esc(m.at)} · 이 파일은 생성 시점의 화면을 그대로 담은 정적 보고서입니다</div></body></html>`;
+      <body><main>${sec.outerHTML}</main><div class="muted" style="text-align:center;padding:12px">KS 마케팅 성과 보드 · 생성 ${esc(m.at)} · 이 파일은 생성 시점의 화면을 그대로 담은 정적 보고서입니다</div></body></html>`;
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'})); a.download=`${m.title}_${m.period.replace(/ /g,'')}.html`; a.click();
     toast('HTML 보고서 저장됨');
   }catch(e){ toast('실패: '+sqlErr(e),6000); }

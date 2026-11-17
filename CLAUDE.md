@@ -1,6 +1,6 @@
-# KS오토플랜 마케팅 퍼포먼스 DB — 작업 지침 (인수인계용)
+# KS 마케팅 성과 보드 (구 마케팅 퍼포먼스 DB) — 작업 지침 (인수인계용)
 
-엑셀 수작업 ROAS 시트를 대체하는 사내 도구. **Supabase(Postgres) + 단일 HTML(GitHub Pages)**.
+엑셀 수작업 ROAS 시트를 대체하는 사내 도구. 화면 이름은 2026-11-17 'KS 마케팅 성과 보드'로 변경(저장소·주소는 그대로). **Supabase(Postgres) + 단일 HTML(GitHub Pages)**.
 운영 주소: https://jisooh-ai.github.io/KSmarketing-db/ · Supabase 프로젝트 ref `qhlygfqetcfnoialihyc`
 사용자: 마케팅팀(비개발자). 대표·임원 보고에 쓰이므로 **숫자 정의가 바뀌면 반드시 사용자에게 먼저 확인**.
 
