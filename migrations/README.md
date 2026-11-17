@@ -15,6 +15,7 @@ Supabase 는 GitHub 과 자동 연결되어 있지 않으므로, 아래 표의 "
 | `2026-11-09_01_매체별_유입키워드.sql` | `fn_media_keywords(p_medias)` — 매체 마스터에 매체별 상위 유입키워드·유입링크 열 표시 | 적용 (2026-11-09 16:35 사용자 확인) | `select proname from pg_proc where proname='fn_media_keywords';` → 1행 |
 | `applied/2026-11-17_차량명_브랜드_1차정리.sql` | car_map 브랜드 미지정 4,081종 1차 정리 (차량 3,057 + 비차량 1,024, 규칙 기반 제안값, 데이터 변경) | **미적용** | `select count(*) from car_map where brand='(비차량)';` → 1,000 이상 |
 | `applied/2026-11-17_미분류매체_담당자확정.sql` | 미분류 매체 13종 담당자 확정(유형·플랫폼·브랜드, 데이터 변경) | **미적용** | `select count(*) from media_map where memo like '%2026-11-17 담당자 확정%';` → 13 |
+| `2026-11-17_01_매체유형_내부_영업부활동.sql` | 매체유형 값 '내부' → '영업부 활동' (제약조건 포함). 화면 유형 목록도 함께 변경됨 — **화면 배포본과 같이 적용해야 체크박스가 맞음** | **미적용** | `select count(*) from media_map where media_type='내부';` → 0 |
 | `applied/2026-10-21_매체브랜드매핑_반영.sql` | media_map 브랜드·유형 일괄 갱신 (데이터 변경) | 적용 (2026-10-21) | 대시보드 브랜드 목록에 2팀 브랜드 표시 |
 
 ## 적용 절차

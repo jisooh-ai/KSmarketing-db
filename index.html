@@ -186,7 +186,7 @@
       <div><label>매체유형 포함</label><div class="chk" id="fTypes">
         <label><input type="checkbox" value="마케팅" checked>마케팅</label>
         <label><input type="checkbox" value="미분류" checked>미분류</label>
-        <label><input type="checkbox" value="내부">내부</label>
+        <label><input type="checkbox" value="영업부 활동">영업부 활동</label>
         <label><input type="checkbox" value="경비">경비</label></div></div>
       <div><button class="btn" onclick="loadDash()">조회</button></div>
     </div>
@@ -206,7 +206,8 @@
         <label><input type="radio" name="grain" value="week">주별</label>
         <label><input type="radio" name="grain" value="day">일별</label>
         <label><input type="radio" name="grain" value="year">연별</label></div>
-      <div class="ms" id="msTrend" style="margin-left:12px"><button class="btn sec sm" type="button" onclick="this.parentNode.classList.toggle('open')">추이 브랜드: 전체 ▾</button><div class="pop"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msTrend',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msTrend',false)">전체 해제</button></div><div class="list"></div></div></div>
+      <div class="ms" id="msTrendType" style="margin-left:12px"><button class="btn sec sm" type="button" onclick="this.parentNode.classList.toggle('open')">추이 유형: 전체 ▾</button><div class="pop"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msTrendType',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msTrendType',false)">전체 해제</button></div><div class="list"></div></div></div>
+      <div class="ms" id="msTrend" style="margin-left:6px"><button class="btn sec sm" type="button" onclick="this.parentNode.classList.toggle('open')">추이 브랜드: 전체 ▾</button><div class="pop"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msTrend',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msTrend',false)">전체 해제</button></div><div class="list"></div></div></div>
       <div class="ms" id="msTrendMedia" style="margin-left:6px"><button class="btn sec sm" type="button" onclick="this.parentNode.classList.toggle('open')">추이 매체: 전체 ▾</button><div class="pop" style="min-width:300px"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msTrendMedia',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msTrendMedia',false)">전체 해제</button><span class="muted" style="margin-left:auto">선택 브랜드의 매체만 표시</span></div><div class="list"></div></div></div>
       <span class="tip" title="브랜드를 고르면 그 브랜드의 광고매체만 목록에 남습니다. 매체를 고르면 DB·계약·실행매출은 그 매체 기준으로, 광고비·ROAS는 매체 단위로 입력되지 않아 표시되지 않습니다">ⓘ</span>
       <span class="muted" id="trendMsg"></span></div>
@@ -638,8 +639,8 @@ $('#upKind').onchange=()=>{ $('#piiBox').style.display = $('#upKind').value==='i
 let BRANDS=[];
 function msFill(id, brands, onchange){ const el=$('#'+id); el.querySelector('.list').innerHTML=[...brands].map(b=>`<label><input type="checkbox" value="${esc(b)}">${esc(b)}</label>`).join(''); el.querySelectorAll('input').forEach(i=>i.onchange=()=>{ msLabel(id); el._dirty=true; onchange&&onchange(); }); msLabel(id); }
 function msSel(id){ return [...document.querySelectorAll('#'+id+' input:checked')].map(i=>i.value); }
-function msAll(id,on){ document.querySelectorAll('#'+id+' input').forEach(i=>i.checked=on); msLabel(id); const el=$('#'+id); el._dirty=true; if(id==='msTrend'||id==='msTrendMedia') trendRefilter(); if(id==='msLead') leadReload(); }
-function msLabel(id){ const sel=msSel(id); const n=document.querySelectorAll('#'+id+' input').length; const b=document.querySelector('#'+id+'>button'); const pre = id==='msTrend'?'추이 브랜드: ': id==='msTrendMedia'?'추이 매체: ':''; const unit = id==='msTrendMedia'?'매체':'브랜드'; b.textContent = pre + (sel.length===0||sel.length===n ? '전체 '+unit : sel.length===1 ? sel[0] : `${sel.length}개 ${unit}`) + ' ▾'; }
+function msAll(id,on){ document.querySelectorAll('#'+id+' input').forEach(i=>i.checked=on); msLabel(id); const el=$('#'+id); el._dirty=true; if(id==='msTrend'||id==='msTrendMedia'||id==='msTrendType') trendRefilter(); if(id==='msLead') leadReload(); }
+function msLabel(id){ const sel=msSel(id); const n=document.querySelectorAll('#'+id+' input').length; const b=document.querySelector('#'+id+'>button'); const pre = id==='msTrend'?'추이 브랜드: ': id==='msTrendMedia'?'추이 매체: ': id==='msTrendType'?'추이 유형: ':''; const unit = id==='msTrendMedia'?'매체': id==='msTrendType'?'유형':'브랜드'; b.textContent = pre + (sel.length===0||sel.length===n ? '전체 '+unit : sel.length===1 ? sel[0] : `${sel.length}개 ${unit}`) + ' ▾'; }
 document.addEventListener('click', e=>{ document.querySelectorAll('.ms.open').forEach(m=>{ if(!m.contains(e.target)){ m.classList.remove('open'); if(m.id==='msBrand' && m._dirty){ m._dirty=false; loadDash(); } } }); });
 function brandOf(r){ return r.brand || r.media_std || '(브랜드 없음)'; }   // 브랜드 미지정 매체는 매체명 그대로 표시
 function filters(){
@@ -691,10 +692,14 @@ function renderTable(id, headers, rows, opts={}){
 }
 function trendSel(){ const sel=msSel('msTrend'); const n=document.querySelectorAll('#msTrend input').length; return (!sel.length||sel.length===n)? null : sel; }
 function trendMediaSel(){ const sel=msSel('msTrendMedia'); const n=document.querySelectorAll('#msTrendMedia input').length; return (!sel.length||sel.length===n)? null : sel; }
-function trendFilter(Pf){ const sel=trendSel(), ms=trendMediaSel(); let out = sel? Pf.filter(r=>sel.includes(brandOf(r))) : Pf; if(ms) out=out.filter(r=>ms.includes(r.media_std)); return out; }
-function trendSpend(){ if(trendMediaSel()) return []; const sel=trendSel(); const S=DASH.S||[]; return sel? S.filter(r=>sel.includes(r.brand)) : S; }   // 매체 선택 시 광고비는 매체 단위가 없어 제외
+function trendTypeSel(){ const el=$('#msTrendType'); if(!el||!el.querySelectorAll('input').length) return null; return msSel('msTrendType'); }
+// 추이 유형: 상단 '매체유형 포함' 과 별개로 추이 카드만의 유형 선택. 기본값 = 상단 선택과 동일. 영업부 활동만 골라 추이를 보는 용도
+function trendTypeInit(types){ const el=$('#msTrendType'); if(!el) return; if(!el.querySelectorAll('input').length){ msFill('msTrendType',['마케팅','영업부 활동','경비','미분류'],trendRefilter); el.querySelectorAll('input').forEach(i=>i.checked=types.includes(i.value)); msLabel('msTrendType'); }
+  else if(!el._dirty){ el.querySelectorAll('input').forEach(i=>i.checked=types.includes(i.value)); msLabel('msTrendType'); } }
+function trendFilter(Pf){ const sel=trendSel(), ms=trendMediaSel(), ts=trendTypeSel(); let out = sel? Pf.filter(r=>sel.includes(brandOf(r))) : Pf; if(ts) out=out.filter(r=>ts.includes(r.media_type)); if(ms) out=out.filter(r=>ms.includes(r.media_std)); return out; }
+function trendSpend(){ if(trendMediaSel()) return []; const ts=trendTypeSel(); if(ts && !ts.includes('마케팅')) return []; const sel=trendSel(); const S=DASH.S||[]; return sel? S.filter(r=>sel.includes(r.brand)) : S; }   // 매체 선택 시 광고비는 매체 단위가 없어 제외
 // 브랜드 선택에 맞춰 매체 목록 채우기 (선택 유지)
-function trendMediaFill(){ if(!DASH.Pall) return; const sel=trendSel(); const rows = sel? DASH.Pall.filter(r=>sel.includes(brandOf(r))) : DASH.Pall; const f=DASH.f||{};
+function trendMediaFill(){ if(!DASH.Pall) return; const sel=trendSel(), ts=trendTypeSel(); let rows = sel? DASH.Pall.filter(r=>sel.includes(brandOf(r))) : DASH.Pall; if(ts) rows=rows.filter(r=>ts.includes(r.media_type)); const f=DASH.f||{};
   const by=new Map(); rows.forEach(r=>{ const k=r.media_std||'(없음)'; by.set(k,(by.get(k)||0)+ +(r[f.dbField]??r.db_count??0)); });
   const list=[...by.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]); const keep=msSel('msTrendMedia');
   const el=$('#msTrendMedia'); el.querySelector('.list').innerHTML=list.map(m=>`<label><input type="checkbox" value="${esc(m)}" ${keep.includes(m)?'checked':''}>${esc(m)} <span class="muted">(${fmt(by.get(m))})</span></label>`).join('');
@@ -801,7 +806,7 @@ document.querySelectorAll('#fGrain input').forEach(r=>r.onchange=async()=>{
   if(!DASH.f) return loadDash();
   const f={...DASH.f, grain:r.value}; $('#trendMsg').textContent='조회 중…';
   try{ const P=await rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:f.basis});
-    const Pf=P.filter(x=>f.types.includes(x.media_type) && (!f.brands.length || f.brands.includes(brandOf(x)))); DASH.f=f; DASH.P=Pf; DASH.Pall=Pf; trendRefilter(); $('#trendMsg').textContent=''; }
+    const Pf=P.filter(x=>f.types.includes(x.media_type) && (!f.brands.length || f.brands.includes(brandOf(x)))); DASH.f=f; DASH.P=Pf; DASH.Pall=P.filter(x=>!f.brands.length || f.brands.includes(brandOf(x))); trendTypeInit(f.types); trendRefilter(); $('#trendMsg').textContent=''; }
   catch(e){ $('#trendMsg').textContent='실패: '+sqlErr(e); }
 });
 async function loadDash(){
@@ -820,7 +825,7 @@ async function loadDash(){
     const took=((Date.now()-t0)/1000).toFixed(1);
     const inc = r => f.types.includes(r.media_type) && (!f.brands.length || f.brands.includes(brandOf(r)));
     const Pf=P.filter(inc), Mf=M.filter(inc); const Sf=(S||[]).filter(r=>!f.brands.length || f.brands.includes(r.brand));
-    const Mall=M.filter(r=>!f.brands.length || f.brands.includes(brandOf(r))); const sAll=sumRows(Mall,f,[]); const excl=['마케팅','내부','경비','미분류'].filter(t=>!f.types.includes(t)); const sExcl=sumRows(Mall.filter(r=>excl.includes(r.media_type)),f,[]);
+    const Mall=M.filter(r=>!f.brands.length || f.brands.includes(brandOf(r))); const sAll=sumRows(Mall,f,[]); const excl=['마케팅','영업부 활동','경비','미분류'].filter(t=>!f.types.includes(t)); const sExcl=sumRows(Mall.filter(r=>excl.includes(r.media_type)),f,[]);
     const PM=(PMraw||P).filter(inc);   // 월별 시리즈 (전월 대비·해석용)
     const SM=Sf.map(r=>({...r, period:String(r.period).slice(0,7)+'-01'}));
     if(st.brands && JSON.stringify(st.brands)!==JSON.stringify(BRANDS)){ BRANDS=st.brands; const keep=msSel('msBrand'); msFill('msBrand',BRANDS); document.querySelectorAll('#msBrand input').forEach(i=>i.checked=keep.includes(i.value)); msLabel('msBrand'); msFill('msTrend',BRANDS,trendRefilter); msFill('msDl',BRANDS); msFill('msLead',BRANDS,leadReload); if(!document.querySelector('#msSpend input')) msFill('msSpend',BRANDS); }
@@ -856,7 +861,7 @@ async function loadDash(){
     ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div>${k[3]||''}<div class="s">${k[2]}</div></div>`).join('');
     if(cur&&prev) $('#kpis').insertAdjacentHTML('beforeend', `<div class="kpi" style="background:#eef2f7"><div class="l">전월 대비 기준</div><div class="v" style="font-size:14px">${esc(prev.m)} → ${esc(cur.m)}</div><div class="s">유입 데이터가 월말까지 있는 마지막 두 달 · 최근 달 매출은 계약 진행 중</div></div>`);
 
-    DASH.Pall=Pf; renderTrend(trendFilter(Pf), f, s);
+    DASH.Pall=P.filter(x=>!f.brands.length || f.brands.includes(brandOf(x))); trendTypeInit(f.types); renderTrend(trendFilter(DASH.Pall), f, sumRows(trendFilter(DASH.Pall), f, trendSpend()));
 
     // 매체별
     const ltByMedia=new Map(LM.map(x=>[x.dim_value,x]));
@@ -1426,7 +1431,7 @@ async function loadMediaMap(){
     MM=await selectAll('v_media_counts'); const f=$('#mmFilter').value, s=$('#mmSearch').value.trim();
     let rows=MM.filter(r=>(f==='all'||r.media_type==='미분류') && (!s||r.media_raw.includes(s)||(r.media_std||'').includes(s))).sort((a,b)=>b.inquiry_count-a.inquiry_count);
     $('#mmMsg').textContent=`${rows.length}종 표시 / 전체 ${MM.length}종`;
-    const types=['마케팅','내부','경비','미분류'];
+    const types=['마케팅','영업부 활동','경비','미분류'];
     renderTable('tMediaMap', ['매체 원문(유입)','유입키워드 · 유입링크 (상위)','유입DB','매출건','표준매체명','유형','플랫폼','브랜드','메모'], rows.map(r=>[esc(r.media_raw), `<div class="mmkw" data-m="${esc(r.media_raw)}" style="max-width:300px;font-size:11.5px;color:#475569;line-height:1.35">…</div>`, fmt(r.inquiry_count), fmt(r.sales_count),
       `<input data-k="${esc(r.media_raw)}" data-f="media_std" value="${esc(r.media_std)}" style="width:220px" onchange="mmDirty(this)">`,
       `<select data-k="${esc(r.media_raw)}" data-f="media_type" onchange="mmDirty(this)">${types.map(t=>`<option ${t===r.media_type?'selected':''}>${t}</option>`).join('')}</select>`,
@@ -1505,7 +1510,7 @@ function objsToRows(objs, cols){ cols=cols||[...new Set(objs.flatMap(o=>Object.k
 function dlFilters(){
   const sel=msSel('msDl'); const n=document.querySelectorAll('#msDl input').length; const brands=(sel.length===0||sel.length===n)?[]:sel;
   const crm=$('#dDupCrm').checked, ip=$('#dDupIp').checked;
-  return { from:$('#dFrom').value, to:$('#dTo').value, basis:$('#dBasis').value, brands, dbField: crm&&ip?'both_db':crm?'net_db':ip?'ip_db':'db_count', dbLabel: crm&&ip?'CRM+IP 중복 제외':crm?'CRM 중복 제외':ip?'IP 중복 제외':'전체', types:['마케팅','내부','경비','미분류'] };
+  return { from:$('#dFrom').value, to:$('#dTo').value, basis:$('#dBasis').value, brands, dbField: crm&&ip?'both_db':crm?'net_db':ip?'ip_db':'db_count', dbLabel: crm&&ip?'CRM+IP 중복 제외':crm?'CRM 중복 제외':ip?'IP 중복 제외':'전체', types:['마케팅','영업부 활동','경비','미분류'] };
 }
 async function mediaRawsForBrands(brands){ // 브랜드 → 매체 원문 목록 (raw 필터용)
   const rows=await selectAll('media_map', q=>q.select('media_raw,media_std,brand'));

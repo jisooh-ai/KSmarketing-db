@@ -450,7 +450,8 @@ end $$;
 -- 유형 체계 정리: (구) 유료광고/오가닉 → 마케팅
 alter table public.media_map drop constraint if exists media_map_media_type_check;
 update public.media_map set media_type='마케팅', updated_at=now() where media_type in ('유료광고','오가닉');
-alter table public.media_map add constraint media_map_media_type_check check (media_type in ('마케팅','내부','경비','미분류'));
+update public.media_map set media_type='영업부 활동', updated_at=now() where media_type='내부';   -- 2026-11-17 이름 변경
+alter table public.media_map add constraint media_map_media_type_check check (media_type in ('마케팅','영업부 활동','경비','미분류'));
 
 -- 이름상 명백한 정산/경비 매체는 기본 유형을 '경비'로 (미분류인 경우에만)
 update public.media_map set media_type='경비', updated_at=now()
