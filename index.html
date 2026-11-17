@@ -210,11 +210,13 @@
       <div class="ms" id="msTrend" style="margin-left:6px"><button class="btn sec sm" type="button" onclick="this.parentNode.classList.toggle('open')">추이 브랜드: 전체 ▾</button><div class="pop"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msTrend',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msTrend',false)">전체 해제</button></div><div class="list"></div></div></div>
       <div class="ms" id="msTrendMedia" style="margin-left:6px"><button class="btn sec sm" type="button" onclick="this.parentNode.classList.toggle('open')">추이 매체: 전체 ▾</button><div class="pop" style="min-width:300px"><div class="tools"><button class="btn sec sm" type="button" onclick="msAll('msTrendMedia',true)">전체 선택</button><button class="btn sec sm" type="button" onclick="msAll('msTrendMedia',false)">전체 해제</button><span class="muted" style="margin-left:auto">선택 브랜드의 매체만 표시</span></div><div class="list"></div></div></div>
       <span class="tip" title="브랜드를 고르면 그 브랜드의 광고매체만 목록에 남습니다. 매체를 고르면 DB·계약·실행매출은 그 매체 기준으로, 광고비·ROAS는 매체 단위로 입력되지 않아 표시되지 않습니다">ⓘ</span>
+      <label style="margin-left:10px;font-size:12px;white-space:nowrap"><input type="checkbox" id="tcmp" onchange="trendRefilter()"> 기준 비교 <span class="tip" title="같은 월 축에 계약일자 기준과 문의일자 기준 실행매출을 나란히 그립니다. 두 기준은 정의가 달라 일치하지 않는 것이 정상이며, 차이는 문의→계약 시차(성숙도)에서 생깁니다">ⓘ</span></label>
       <span class="muted" id="trendMsg"></span></div>
     <div class="grid2">
       <div><h3 id="chTrendTitle">광고비 · 실행매출 · ROAS</h3><canvas id="chTrend" style="max-height:300px"></canvas></div>
       <div><h3>DB · 계약 · 전환율</h3><canvas id="chTrend2" style="max-height:300px"></canvas></div>
     </div>
+    <div id="chTrendCmpWrap" style="display:none;margin-top:12px"><h3>매출 기준 비교 <span class="muted">(계약일자 vs 문의일자 실행매출 · 점선 = 차이)</span></h3><canvas id="chTrendCmp" style="max-height:300px"></canvas><div class="muted" id="tcmpNote" style="margin-top:4px"></div></div>
     <div class="card" data-detail="media"><h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">매체별 추이 비교 <span class="tip" title="선택한 매체(없으면 선택 브랜드 안에서 DB 많은 순 6개)를 기간별로 겹쳐 비교. 지표를 바꿔 볼 수 있습니다">ⓘ</span>
       <select id="tmMetric" style="padding:3px 6px;font-size:12px" onchange="trendRefilter()"><option value="dbSel">DB수</option><option value="contracts">계약수</option><option value="cv">전환율(%)</option><option value="revenue">실행매출</option></select>
       <span class="muted" id="tmNote"></span></h3><canvas id="chTrendMedia" style="max-height:320px"></canvas></div>
@@ -780,6 +782,28 @@ function stampPeriods(){
     tag.textContent=periodTag(extra); tag.title='이 카드의 숫자가 집계된 조건';
   });
 }
+const BASIS_LABEL={contract:'계약일자',inquiry:'문의일자'};
+// 다른 기준의 합계 (같은 유형·브랜드 필터 적용)
+function altSum(f){ const P2=DASH.P2raw; if(!P2) return null; const inc=x=>f.types.includes(x.media_type) && (!f.brands.length || f.brands.includes(brandOf(x))); DASH.P2=P2.filter(inc); return sumRows(DASH.P2, f, []); }
+function basisAltLine(f, s){ const a=altSum(f); if(!a) return ''; const d=s.revenue-a.revenue; const sign=d>=0?'+':'−';
+  return `<br><span title="같은 기간을 ${BASIS_LABEL[DASH.basis2]} 기준으로 집계한 값. 두 기준은 정의가 달라 일치하지 않으며, 차이는 문의→계약 시차에서 생깁니다">${BASIS_LABEL[DASH.basis2]} 기준 <b>${won(a.revenue)}</b> · 계약 ${fmt(a.contracts)}건 · 차이 ${sign}${won(Math.abs(d))}</span>`; }
+// 기준 비교 차트: 같은 월 축에 계약일자·문의일자 실행매출을 나란히, 차이선
+function renderBasisCompare(tr, f){
+  const wrap=$('#chTrendCmpWrap'); const on=$('#tcmp')?.checked; if(!wrap) return; wrap.style.display = on? 'block':'none'; if(!on) return;
+  const P2=(DASH.P2raw||[]).filter(x=>!f.brands.length||f.brands.includes(brandOf(x))); const sel=trendSel(), ts=trendTypeSel(), ms=trendMediaSel();
+  let rows=P2; if(sel) rows=rows.filter(r=>sel.includes(brandOf(r))); rows=rows.filter(r=>(ts||f.types).includes(r.media_type)); if(ms) rows=rows.filter(r=>ms.includes(r.media_std));
+  const by2=groupBy(rows, r=>r.period); const cur=f.basis, alt=DASH.basis2;
+  const rev2=tr.map(x=>sumRows(by2.get(x.p)||[],f,[]));
+  const lastN=f.grain==='month'?2: f.grain==='week'?8: f.grain==='day'?60:0; const n=tr.length;
+  const inqIdx = cur==='inquiry' ? 'cur' : 'alt';   // 어느 쪽이 문의월(미성숙 표시 대상)인지
+  const immature = i => lastN && i>=n-lastN;
+  const dsCur={type:'bar',label:`실행매출 · ${BASIS_LABEL[cur]}`,data:tr.map(x=>x.revenue),backgroundColor:tr.map((x,i)=> (inqIdx==='cur'&&immature(i))? 'rgba(37,99,235,.35)':'rgba(37,99,235,.8)'),yAxisID:'y'};
+  const dsAlt={type:'bar',label:`실행매출 · ${BASIS_LABEL[alt]}`,data:rev2.map(x=>x.revenue),backgroundColor:tr.map((x,i)=> (inqIdx==='alt'&&immature(i))? 'rgba(245,158,11,.35)':'rgba(245,158,11,.8)'),yAxisID:'y'};
+  const diff={type:'line',label:`차이 (${BASIS_LABEL[cur]} − ${BASIS_LABEL[alt]})`,data:tr.map((x,i)=>x.revenue-rev2[i].revenue),borderColor:'#6b7280',backgroundColor:'#6b7280',borderDash:[5,4],yAxisID:'y2',tension:.2,borderWidth:2,pointRadius:3};
+  chart('chTrendCmp',{data:{labels:tr.map(x=>x.label),datasets:[dsCur,dsAlt,diff]},options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${won(c.parsed.y)}`}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>won(v)}},y2:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>won(v)},title:{display:true,text:'차이'}}}}});
+  const sumCur=tr.reduce((a,x)=>a+x.revenue,0), sumAlt=rev2.reduce((a,x)=>a+x.revenue,0);
+  $('#tcmpNote').innerHTML=`합계 ${BASIS_LABEL[cur]} <b>${won(sumCur)}</b> vs ${BASIS_LABEL[alt]} <b>${won(sumAlt)}</b> · 연한 막대 = 문의월 기준의 최근 ${lastN||0}개 구간(계약이 아직 쌓이는 중, 숫자가 계속 커짐) · 차이선이 +면 과거 유입이 지금 계약으로 익는 중, −면 최근 유입이 아직 안 익음`;
+}
 function renderTrend(Pf, f, s){
     const Sp=trendSpend(); const bySP=groupBy(Sp, r=>r.period);
   const byP=groupBy(Pf, r=>r.period); const periods=[...new Set([...byP.keys(), ...bySP.keys()])].sort();
@@ -799,6 +823,7 @@ function renderTrend(Pf, f, s){
     {type:'bar',label:'계약수',data:tr.map(x=>x.contracts),backgroundColor:'rgba(16,185,129,.85)',yAxisID:'y2'},
     {type:'line',label:'전환율(%)',data:tr.map(x=>x.dbSel? +(100*x.contracts/x.dbSel).toFixed(2) : null),borderColor:'#7c3aed',backgroundColor:'#7c3aed',yAxisID:'y3',tension:.2,borderWidth:3}]},
     options:{responsive:true,interaction:{mode:'index',intersect:false},scales:{y:{position:'left',beginAtZero:true},y2:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false}},y3:{display:false,beginAtZero:true}}}});
+  try{ renderBasisCompare(tr, f); }catch(e){ console.warn('basis compare', e); }
 
 }
 // 추이 단위 라디오 변경 → 추이만 다시 조회 (서버 1회, 경량)
@@ -818,6 +843,9 @@ async function loadDash(){
     const args={p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:f.basis,p_brands:f.brands.length?f.brands:null};
     let D = await rpc('fn_dashboard',args);
     const PMraw = f.grain==='month' ? null : await rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:'month',p_basis:f.basis});
+    // 다른 매출 기준(계약일자↔문의일자)의 기간별 수치 — KPI 보조 줄·기준 비교 차트용 (실패해도 화면은 진행)
+    const basis2 = f.basis==='inquiry' ? 'contract' : 'inquiry'; let P2raw=null;
+    try{ P2raw = await rpc('fn_media_period',{p_from:f.from,p_to:f.to,p_grain:f.grain,p_basis:basis2}); }catch(e){ P2raw=null; }
     if((D.status.inquiries>0 || D.status.car_unmapped>0) && (!(D.status.agg_rows>0) || !(D.status.agg_car_rows>0))){ loading(true,'집계 테이블이 비어 있어 갱신 중… (최초 1회)',50); await refreshAggAll('최초 집계'); loading(true,'다시 조회 중…',75); D = await rpc('fn_dashboard',args); }
     loading(true,'화면 그리는 중…',90);
     if(D.status.ip_pending>0) ipMigrateLoop(D.status.ip_pending);
@@ -829,7 +857,7 @@ async function loadDash(){
     const PM=(PMraw||P).filter(inc);   // 월별 시리즈 (전월 대비·해석용)
     const SM=Sf.map(r=>({...r, period:String(r.period).slice(0,7)+'-01'}));
     if(st.brands && JSON.stringify(st.brands)!==JSON.stringify(BRANDS)){ BRANDS=st.brands; const keep=msSel('msBrand'); msFill('msBrand',BRANDS); document.querySelectorAll('#msBrand input').forEach(i=>i.checked=keep.includes(i.value)); msLabel('msBrand'); msFill('msTrend',BRANDS,trendRefilter); msFill('msDl',BRANDS); msFill('msLead',BRANDS,leadReload); if(!document.querySelector('#msSpend input')) msFill('msSpend',BRANDS); }
-    DASH={f, P:Pf, M:Mf, S:Sf, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM:LDM||[], ldDim:'media_brand', LQ:LQ||[], LQT:LQT||[], lqDim:'media_brand', st, CH:CH||[], CHT:CHT||[]}; const ldd=$('#ldDim'); if(ldd) ldd.value='media_brand'; const lqd=$('#lqDim'); if(lqd) lqd.value='media_brand';
+    DASH={basis2, P2raw, f, P:Pf, M:Mf, S:Sf, C, L0, LM, LC, LB, LD, LMB, LPL, LT, LDM:LDM||[], ldDim:'media_brand', LQ:LQ||[], LQT:LQT||[], lqDim:'media_brand', st, CH:CH||[], CHT:CHT||[]}; const ldd=$('#ldDim'); if(ldd) ldd.value='media_brand'; const lqd=$('#lqDim'); if(lqd) lqd.value='media_brand';
     const unc = M.filter(r=>r.media_type==='미분류').length;
     $('#status').innerHTML = `<span class="pill ok">조회 완료 ${took}초</span>` + (f.brands.length?` <span class="pill">브랜드: ${esc(f.brands.join(', '))}</span>`:'') + ` 유입 ${fmt(st.inquiries)}건 (${(st.inquiry_min||'').slice(0,10)} ~ ${(st.inquiry_max||'').slice(0,10)}) · 활성 매출 ${fmt(st.sales_active)}건 (계약일 ${st.contract_min||'-'} ~ ${st.contract_max||'-'}) · 광고비 입력 ${fmt(st.ad_spend_days)}일 (최근 ${st.ad_spend_max||'-'})`
       + (st.sales_unmatched? ` · <span class="pill warn">미매칭 매출 ${fmt(st.sales_unmatched)}건 (유입 매체에 없음, 집계 제외)</span>`:'')
@@ -852,7 +880,7 @@ async function loadDash(){
     const roasOf=x=>x.cost? 100*x.revenue/x.cost : null, cpaOf=x=>x.cost&&x.dbSel? x.cost/x.dbSel : null, cpcOf=x=>x.cost&&x.contracts? x.cost/x.contracts : null, cvOf=x=>x.dbSel? 100*x.contracts/x.dbSel : null;
     $('#kpis').innerHTML=[
       ['광고비' + (f.brands.length? ` · ${f.brands.length===1? f.brands[0] : f.brands.length+'개 브랜드'}` : ' · 전체 브랜드'), won(s.cost), s.cost?'':'광고비 미입력 (광고비 탭)', kd(x=>x.cost,true)],
-      ['실행매출' + (excl.length? ` · ${f.types.join('·')}` : ''), won(s.revenue), excl.length? `<span title="매체유형 필터와 무관한 합계 (${excl.join('·')} ${won(sExcl.revenue)} 포함)">전체 ${won(sAll.revenue)} · 계약 ${fmt(sAll.contracts)}건</span> · 건당 ${won(s.contracts? s.revenue/s.contracts:null)}` : `건당 ${won(s.contracts? s.revenue/s.contracts:null)}`, kd(x=>x.revenue,true)],
+      ['실행매출' + (excl.length? ` · ${f.types.join('·')}` : ''), won(s.revenue), (excl.length? `<span title="매체유형 필터와 무관한 합계 (${excl.join('·')} ${won(sExcl.revenue)} 포함)">전체 ${won(sAll.revenue)} · 계약 ${fmt(sAll.contracts)}건</span> · 건당 ${won(s.contracts? s.revenue/s.contracts:null)}` : `건당 ${won(s.contracts? s.revenue/s.contracts:null)}`) + basisAltLine(f, s), kd(x=>x.revenue,true)],
       ['ROAS', s.cost? fmt(100*s.revenue/s.cost,1)+'%' : '-', '', kd(roasOf,true)],
       ['계약 수', fmt(s.contracts), '', kd(x=>x.contracts,true)],
       ['CPA (DB당 비용)', s.cost&&s.dbSel? fmt(s.cost/s.dbSel)+'원':'-', `DB ${fmt(s.dbSel)}건 (${f.dbLabel})`, kd(cpaOf,false)],
@@ -1617,7 +1645,8 @@ function reportMeta(){
 function reportHeadHtml(m){
   return `<h1 style="font-size:18px;margin:0 0 4px">${esc(m.title)}</h1>
   <div class="muted">기간 <b>${esc(m.period)}</b> · 매출 기준일 <b>${esc(m.basis)}</b> · 브랜드 <b>${esc(m.brands)}</b> · 중복 제외 <b>${esc(m.dedup)}</b> · 매체유형 <b>${esc(m.types)}</b><br>
-  기간별 추이 <b>${esc(m.trend)}</b>(브랜드 ${esc(m.trendBrands)}) · 리드타임 브랜드 <b>${esc(m.leadBrands)}</b> · 생성 ${esc(m.at)} · ${esc(m.by)}</div>`;
+  기간별 추이 <b>${esc(m.trend)}</b>(브랜드 ${esc(m.trendBrands)}) · 리드타임 브랜드 <b>${esc(m.leadBrands)}</b> · 생성 ${esc(m.at)} · ${esc(m.by)}</div>
+  <div class="muted" style="margin-top:6px;padding:6px 8px;background:#f8fafc;border:1px solid var(--line);border-radius:6px">※ 이 보고서의 매출·계약·ROAS 는 <b>${esc(m.basis)} 기준</b> 하나로 집계했습니다. 채널·브랜드 효율 비교는 문의일자(코호트) 기준, 월 실적 총액은 계약일자 기준이 적합하며, CRM 정산월 기준 숫자와는 정의가 달라 일치하지 않습니다(차이 = 문의→계약→정산 시차).</div>`;
 }
 async function exportReport(kind){
   if(!DASH.f){ return toast('먼저 대시보드를 조회하세요'); }
@@ -1637,7 +1666,7 @@ async function exportReport(kind){
     cl.forEach((c,i)=>{ const img=document.createElement('img'); try{ img.src=live[i].toDataURL('image/png'); }catch(e){} img.style.maxWidth='100%'; img.style.height='auto'; c.replaceWith(img); });
     // 필터·컨트롤 제거, 표 스크롤 해제
     sec.querySelector('#filterCard')?.remove();
-    sec.querySelectorAll('.ms, #fGrain, #fLeadGrain, #trendMsg, #leadMsg, button').forEach(e=>e.remove());
+    sec.querySelectorAll('.ms, #fGrain, #fLeadGrain, #trendMsg, #leadMsg, button').forEach(e=>e.remove()); sec.querySelector('#tcmp')?.parentElement?.remove();
     sec.querySelectorAll('.tw').forEach(e=>{ e.style.maxHeight='none'; e.style.overflow='visible'; });
     sec.querySelector('#rptHead').style.display='block';
     const css=[...document.querySelectorAll('style')].map(x=>x.textContent).join('\n');
