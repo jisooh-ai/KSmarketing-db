@@ -901,7 +901,7 @@ async function loadDash(){
 
     // 차량
     const cars=C.map(r=>({...r, dbSel: r[f.dbField]??r.db_count}));
-    const named=cars.filter(x=>x.model_std && !['(없음)','-','없음 없음'].includes(x.model_std.trim()));
+    const named=cars.filter(x=>x.model_std && !['(없음)','-','없음 없음','(비차량)'].includes(x.model_std.trim()) && x.car_brand!=='(비차량)');
     const ci=[...named].sort((a,b)=>b.dbSel-a.dbSel || b.contracts-a.contracts).slice(0,15), cs=[...named].sort((a,b)=>b.contracts-a.contracts || b.dbSel-a.dbSel).slice(0,15);
     const carRow = x => [esc(x.model_std||'(없음)'), esc(x.car_brand??''), fmt(x.db_count), fmt(x.dbSel), fmt(x.contracts), pct(x.contracts,x.dbSel), won(x.revenue), won(x.car_price_sum)];
     renderTable('tCarInq', ['차량','브랜드','DB(전체)','DB(제외후)','계약','전환율','실행매출','차량가 합계'], ci.map(carRow), {left:[0,1]});
